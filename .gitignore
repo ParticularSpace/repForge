@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Environment files — never commit secrets
+.env
+.env.local
+.env.production
+
+# Build outputs
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc junk
+nul
+{frontend
+
+# Claude Code local settings
+.claude/

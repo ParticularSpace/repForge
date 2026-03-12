@@ -1,0 +1,17 @@
+{
+  "name": "app-scaffold",
+  "version": "1.0.0",
+  "description": "- **Frontend**: React + TypeScript + Vite + Tailwind CSS + React Query - **Backend**: Node.js + TypeScript + Fastify - **Database**: Supabase (PostgreSQL + Auth + Storage) - **ORM**: Prisma - **Future Desktop**: Electron",
+  "main": "index.js",
+  "scripts": {
+    "start": "node start.js",
+    "dev": "node start.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

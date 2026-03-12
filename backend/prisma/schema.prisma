@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+  @@map("users")
+}
+
+model Workout {
+  id          String     @id @default(uuid())
+  userId      String     @map("user_id")
+  name        String
+  type        String
+  difficulty  String
+  startedAt   DateTime   @default(now()) @map("started_at")
+  completedAt DateTime?  @map("completed_at")
+  durationMin Int?       @map("duration_min")
+  exercises   Exercise[]
+  @@map("workouts")
+}
+
+model Exercise {
+  id        String   @id @default(uuid())
+  workoutId String   @map("workout_id")
+  workout   Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  name      String
+  order     Int
+  sets      Int
+  reps      Int
+  weightLbs Float?   @map("weight_lbs")
+  notes     String?
+  setLogs   SetLog[]
+  @@map("exercises")
+}
+
+model SetLog {
+  id            String   @id @default(uuid())
+  exerciseId    String   @map("exercise_id")
+  exercise      Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  setNumber     Int      @map("set_number")
+  completedAt   DateTime @default(now()) @map("completed_at")
+  actualReps    Int?     @map("actual_reps")
+  actualWeight  Float?   @map("actual_weight")
+  @@map("set_logs")
+}
