@@ -21,6 +21,7 @@ Thumbs.db
 # Misc junk
 nul
 {frontend
+{routes,middleware,services,types}
 
 # Claude Code local settings
 .claude/
