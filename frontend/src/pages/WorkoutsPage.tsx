@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { useGenerateWorkout, useCreateWorkout, useProfile } from '@/hooks/useWorkouts'
-import { useTemplates, useCreateTemplate, useUpdateTemplateExercises, useDeleteTemplate, useStartTemplate } from '@/hooks/useTemplates'
+import { useTemplates, useCreateTemplate, useUpdateTemplate, useStartTemplate } from '@/hooks/useTemplates'
 import { useExerciseSearch, useCreateExercise } from '@/hooks/useExerciseLibrary'
 import EditExerciseModal from '@/components/workout/EditExerciseModal'
+import Toast from '@/components/ui/Toast'
 import Chip from '@/components/ui/Chip'
 import { formatWeight } from '@/lib/formatWeight'
-import type { WorkoutType, Difficulty, ExercisePlan, LibraryExercise, WorkoutTemplate, TemplateExercise } from '@/types'
+import type { WorkoutType, Difficulty, ExercisePlan, LibraryExercise, WorkoutTemplate } from '@/types'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -36,20 +37,6 @@ type Tab = 'generate' | 'build' | 'templates'
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return 'Never'
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-// ─── Toast ───────────────────────────────────────────────────────────────────
-
-function Toast({ message, onDone }: { message: string; onDone: () => void }) {
-  useEffect(() => {
-    const t = setTimeout(onDone, 2000)
-    return () => clearTimeout(t)
-  }, [onDone])
-  return (
-    <div className="fixed bottom-32 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-sm px-4 py-2 rounded-full shadow-lg z-50 pointer-events-none">
-      {message}
-    </div>
-  )
 }
 
 // ─── Generate Sub-tab ────────────────────────────────────────────────────────
@@ -207,7 +194,7 @@ function ExerciseSearchDropdown({
   )
 }
 
-function AddCustomForm({ onDone }: { onDone: (ex: LibraryExercise) => void; onCancel: () => void }) {
+function AddCustomForm({ onDone, onCancel }: { onDone: (ex: LibraryExercise) => void; onCancel: () => void }) {
   const [name, setName] = useState('')
   const [muscles, setMuscles] = useState<string[]>([])
   const [equipment, setEquipment] = useState('')
@@ -251,30 +238,50 @@ function AddCustomForm({ onDone }: { onDone: (ex: LibraryExercise) => void; onCa
       {createExercise.isError && (
         <p className="text-xs text-red-500 mb-2">{(createExercise.error as Error).message}</p>
       )}
-      <button
-        onClick={handleSubmit}
-        disabled={!name.trim() || muscles.length === 0 || createExercise.isPending}
-        className="bg-teal-600 text-white text-sm rounded-lg px-4 py-2 font-medium disabled:opacity-50"
-      >
-        {createExercise.isPending ? 'Adding…' : 'Add exercise'}
-      </button>
+      <div className="flex gap-2">
+        <button
+          onClick={onCancel}
+          className="border border-gray-200 text-gray-600 text-sm rounded-lg px-4 py-2 font-medium"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSubmit}
+          disabled={!name.trim() || muscles.length === 0 || createExercise.isPending}
+          className="bg-teal-600 text-white text-sm rounded-lg px-4 py-2 font-medium disabled:opacity-50"
+        >
+          {createExercise.isPending ? 'Adding…' : 'Add exercise'}
+        </button>
+      </div>
     </div>
   )
 }
 
-function BuildTab() {
+function BuildTab({ editingTemplate }: { editingTemplate?: WorkoutTemplate }) {
   const navigate = useNavigate()
   const { data: profile } = useProfile()
   const createWorkout = useCreateWorkout()
   const createTemplate = useCreateTemplate()
+  const updateTemplate = useUpdateTemplate()
 
-  const [workoutName, setWorkoutName] = useState('')
-  const [workoutType, setWorkoutType] = useState<WorkoutType>('push')
-  const [exercises, setExercises] = useState<BuildExercise[]>([])
+  const [workoutName, setWorkoutName] = useState(() => editingTemplate?.name ?? '')
+  const [workoutType, setWorkoutType] = useState<WorkoutType>(() => (editingTemplate?.type as WorkoutType) ?? 'push')
+  const [exercises, setExercises] = useState<BuildExercise[]>(() =>
+    editingTemplate?.exercises.map(e => ({
+      _key: e.id,
+      name: e.name,
+      order: e.order,
+      sets: e.sets,
+      reps: e.reps,
+      weightLbs: e.weightLbs ?? 0,
+      restSeconds: e.restSeconds ?? undefined,
+      muscleGroups: e.muscleGroups,
+    })) ?? []
+  )
   const [editTarget, setEditTarget] = useState<{ ex: BuildExercise; index: number } | null>(null)
   const [showCustomForm, setShowCustomForm] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [toast, setToast] = useState(false)
 
   const addFromLibrary = (lib: LibraryExercise) => {
     const ex: BuildExercise = {
@@ -288,7 +295,6 @@ function BuildTab() {
       muscleGroups: lib.muscleGroups,
       description: lib.description,
     }
-    // open edit modal pre-filled
     setEditTarget({ ex, index: exercises.length })
   }
 
@@ -296,7 +302,6 @@ function BuildTab() {
     if (editTarget === null) return
     const buildEx: BuildExercise = { ...updated, _key: editTarget.ex._key }
     if (editTarget.index >= exercises.length) {
-      // new exercise
       setExercises(prev => [...prev, { ...buildEx, order: prev.length + 1 }])
     } else {
       setExercises(prev => prev.map((e, i) => i === editTarget.index ? { ...buildEx, order: e.order } : e))
@@ -329,40 +334,40 @@ function BuildTab() {
   const handleStart = async () => {
     if (exercises.length === 0) { setError('Add at least one exercise.'); return }
     setError(null)
-    const name = workoutName.trim() || 'My workout'
-    const workout = await createWorkout.mutateAsync({
-      name,
-      type: workoutType,
-      difficulty: 'intermediate',
-      exercises,
-      source: 'manual',
-    })
-    navigate(`/workout/${workout.id}/active`, { replace: true })
-  }
+    const day = new Date().toLocaleDateString('en-US', { weekday: 'long' })
+    const name = workoutName.trim() || `My workout · ${day}`
 
-  const handleSaveTemplate = async () => {
-    if (exercises.length === 0) { setError('Add at least one exercise.'); return }
-    const name = workoutName.trim() || 'My routine'
-    setError(null)
-    await createTemplate.mutateAsync({
-      name,
-      type: workoutType,
-      source: 'manual',
-      exercises: exercises.map(e => ({
-        name: e.name,
-        order: e.order,
-        sets: e.sets,
-        reps: e.reps,
-        weightLbs: e.weightLbs,
-        restSeconds: e.restSeconds,
-        muscleGroups: e.muscleGroups ?? [],
-      })),
+    const workoutPromise = createWorkout.mutateAsync({
+      name, type: workoutType, difficulty: 'intermediate', exercises, source: 'manual',
     })
-    setSaveSuccess(true)
+
+    // Auto-save template (fire and forget)
+    const templateExercises = exercises.map(e => ({
+      name: e.name, order: e.order, sets: e.sets, reps: e.reps,
+      weightLbs: e.weightLbs, restSeconds: e.restSeconds, muscleGroups: e.muscleGroups ?? [],
+    }))
+    if (editingTemplate) {
+      updateTemplate.mutate({ id: editingTemplate.id, data: { name, type: workoutType, exercises: templateExercises } })
+    } else {
+      createTemplate.mutate({ name, type: workoutType, source: 'manual', exercises: templateExercises })
+    }
+
+    const workout = await workoutPromise
+    setToast(true)
+    setTimeout(() => {
+      navigate(`/workout/${workout.id}/active`, { replace: true })
+    }, 1000)
   }
 
   return (
     <div>
+      {/* Editing banner */}
+      {editingTemplate && (
+        <div className="bg-teal-50 border border-teal-100 rounded-xl px-3 py-2.5 mb-4">
+          <p className="text-xs text-teal-700 font-medium">Editing "{editingTemplate.name}" — Start to save and begin.</p>
+        </div>
+      )}
+
       {/* Workout name */}
       <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-4 shadow-sm">
         <input
@@ -414,10 +419,7 @@ function BuildTab() {
       {/* Search / add exercise */}
       {showCustomForm ? (
         <AddCustomForm
-          onDone={lib => {
-            addFromLibrary(lib)
-            setShowCustomForm(false)
-          }}
+          onDone={lib => { addFromLibrary(lib); setShowCustomForm(false) }}
           onCancel={() => setShowCustomForm(false)}
         />
       ) : (
@@ -427,22 +429,14 @@ function BuildTab() {
         />
       )}
 
-      {/* Error */}
       {error && <p className="text-xs text-red-500 mt-3">{error}</p>}
 
-      {/* Footer buttons */}
-      <div className="flex gap-3 mt-5">
-        <button
-          onClick={handleSaveTemplate}
-          disabled={createTemplate.isPending || createWorkout.isPending}
-          className="flex-1 border border-gray-200 text-gray-600 rounded-xl py-3.5 font-medium text-sm disabled:opacity-50"
-        >
-          {createTemplate.isPending ? 'Saving…' : 'Save as template'}
-        </button>
+      {/* Start button */}
+      <div className="mt-5">
         <button
           onClick={handleStart}
-          disabled={createWorkout.isPending || createTemplate.isPending}
-          className="flex-[2] bg-teal-600 text-white rounded-xl py-3.5 font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+          disabled={createWorkout.isPending}
+          className="w-full bg-teal-600 text-white rounded-xl py-3.5 font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {createWorkout.isPending
             ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Starting…</>
@@ -459,123 +453,27 @@ function BuildTab() {
         />
       )}
 
-      {saveSuccess && <Toast message="Template saved!" onDone={() => setSaveSuccess(false)} />}
+      {toast && <Toast message="Routine saved!" onDone={() => setToast(false)} />}
     </div>
   )
 }
 
 // ─── Templates Sub-tab ────────────────────────────────────────────────────────
 
-function TemplateEditMode({
-  template,
-  onBack,
-}: {
-  template: WorkoutTemplate
-  onBack: () => void
-}) {
-  const { data: profile } = useProfile()
-  const updateExercises = useUpdateTemplateExercises(template.id)
-  const [editTarget, setEditTarget] = useState<TemplateExercise | null>(null)
-  const [toast, setToast] = useState(false)
-
-  const handleSave = async (updated: ExercisePlan) => {
-    if (!editTarget) return
-    await updateExercises.mutateAsync([{
-      id: editTarget.id,
-      sets: updated.sets,
-      reps: updated.reps,
-      weightLbs: updated.weightLbs,
-      restSeconds: updated.restSeconds,
-    }])
-    setEditTarget(null)
-    setToast(true)
-  }
-
-  return (
-    <div>
-      <button onClick={onBack} className="flex items-center gap-2 text-sm text-gray-500 mb-4">
-        ← Back to templates
-      </button>
-      <h2 className="text-lg font-bold text-gray-900 mb-1">{template.name}</h2>
-      <p className="text-xs text-gray-400 mb-3">Editing weights and reps only. To change exercises, create a new routine in the Build tab.</p>
-
-      <div className="flex flex-col gap-3">
-        {template.exercises.map(ex => (
-          <div key={ex.id} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm flex items-start gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-gray-900 text-sm">{ex.name}</p>
-              <p className="text-xs text-gray-400 mt-0.5">
-                {ex.sets} × {ex.reps} @ {formatWeight(ex.weightLbs)}
-                {ex.restSeconds ? ` · ${ex.restSeconds}s rest` : ''}
-              </p>
-            </div>
-            <button
-              onClick={() => setEditTarget(ex)}
-              className="text-gray-300 hover:text-teal-500 shrink-0 flex items-center justify-center min-w-[44px] min-h-[44px]"
-              aria-label={`Edit ${ex.name}`}
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="8" cy="8" r="2.5"/>
-                <path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7"/>
-              </svg>
-            </button>
-          </div>
-        ))}
-      </div>
-
-      {editTarget && (
-        <EditExerciseModal
-          exercise={{
-            name: editTarget.name,
-            order: editTarget.order,
-            sets: editTarget.sets,
-            reps: editTarget.reps,
-            weightLbs: editTarget.weightLbs ?? 0,
-            restSeconds: editTarget.restSeconds ?? profile?.preferredRestSeconds ?? 60,
-          }}
-          defaultRestSeconds={profile?.preferredRestSeconds ?? 60}
-          onSave={handleSave}
-          onClose={() => setEditTarget(null)}
-        />
-      )}
-
-      {toast && <Toast message="Saved!" onDone={() => setToast(false)} />}
-    </div>
-  )
-}
-
 function TemplatesTab() {
   const navigate = useNavigate()
   const { data, isLoading } = useTemplates()
-  const deleteTemplate = useDeleteTemplate()
   const startTemplate = useStartTemplate()
-  const [editTemplate, setEditTemplate] = useState<WorkoutTemplate | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [startingId, setStartingId] = useState<string | null>(null)
 
-  if (editTemplate) {
-    // find fresh copy from data
-    const fresh = [...(data?.manual ?? []), ...(data?.ai ?? [])].find(t => t.id === editTemplate.id) ?? editTemplate
-    return <TemplateEditMode template={fresh} onBack={() => setEditTemplate(null)} />
-  }
-
-  const handleStart = async (id: string) => {
+  const handleStart = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
     setStartingId(id)
     try {
       const { workoutId } = await startTemplate.mutateAsync(id)
       navigate(`/workout/${workoutId}/active`, { replace: true })
     } finally {
       setStartingId(null)
-    }
-  }
-
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Delete this template?')) return
-    setDeletingId(id)
-    try {
-      await deleteTemplate.mutateAsync(id)
-    } finally {
-      setDeletingId(null)
     }
   }
 
@@ -591,7 +489,7 @@ function TemplatesTab() {
     return (
       <div className="bg-white rounded-2xl border border-gray-100 p-6 text-center shadow-sm">
         <p className="text-sm text-gray-500 leading-relaxed">
-          Save a workout from the Build tab to see it here. Or start a generated workout — it'll be saved automatically.
+          Start a workout from the Build tab to save it here. Or generate an AI workout — it'll be saved automatically.
         </p>
       </div>
     )
@@ -606,7 +504,7 @@ function TemplatesTab() {
             {manual.map(t => (
               <button
                 key={t.id}
-                onClick={() => setEditTemplate(t)}
+                onClick={() => navigate(`/workouts/templates/${t.id}`)}
                 className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm text-left w-full"
               >
                 <div className="flex items-start justify-between gap-3">
@@ -617,23 +515,13 @@ function TemplatesTab() {
                       {t.useCount > 0 ? ` · Used ${t.useCount}×` : ''}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={e => { e.stopPropagation(); handleDelete(t.id) }}
-                      disabled={deletingId === t.id}
-                      className="text-xs text-gray-300 hover:text-red-400 px-1 disabled:opacity-50"
-                      aria-label="Delete template"
-                    >
-                      {deletingId === t.id ? '…' : '···'}
-                    </button>
-                    <button
-                      onClick={e => { e.stopPropagation(); handleStart(t.id) }}
-                      disabled={startingId === t.id}
-                      className="text-sm font-semibold text-teal-600 disabled:opacity-50 py-1 px-2"
-                    >
-                      {startingId === t.id ? '…' : 'Start ›'}
-                    </button>
-                  </div>
+                  <button
+                    onClick={e => handleStart(e, t.id)}
+                    disabled={startingId === t.id}
+                    className="text-sm font-semibold text-teal-600 disabled:opacity-50 shrink-0 py-1 px-2"
+                  >
+                    {startingId === t.id ? '…' : 'Start ›'}
+                  </button>
                 </div>
               </button>
             ))}
@@ -646,7 +534,11 @@ function TemplatesTab() {
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">AI generated</p>
           <div className="flex flex-col gap-3">
             {ai.map(t => (
-              <div key={t.id} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+              <button
+                key={t.id}
+                onClick={() => navigate(`/workouts/templates/${t.id}`)}
+                className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm text-left w-full"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-gray-900 text-sm">{t.name}</p>
@@ -657,14 +549,14 @@ function TemplatesTab() {
                     </p>
                   </div>
                   <button
-                    onClick={() => handleStart(t.id)}
+                    onClick={e => handleStart(e, t.id)}
                     disabled={startingId === t.id}
                     className="text-sm font-semibold text-teal-600 disabled:opacity-50 shrink-0 py-1 px-2"
                   >
                     {startingId === t.id ? '…' : 'Start ›'}
                   </button>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -675,10 +567,19 @@ function TemplatesTab() {
 
 // ─── WorkoutsPage ─────────────────────────────────────────────────────────────
 
+interface WorkoutsState {
+  activeTab?: Tab
+  editingTemplate?: WorkoutTemplate
+}
+
 const TAB_STORAGE_KEY = 'workouts_tab'
 
 export default function WorkoutsPage() {
+  const location = useLocation()
+  const navState = location.state as WorkoutsState | null
+
   const [tab, setTab] = useState<Tab>(() => {
+    if (navState?.activeTab) return navState.activeTab
     const stored = localStorage.getItem(TAB_STORAGE_KEY)
     return (stored as Tab) || 'generate'
   })
@@ -687,6 +588,8 @@ export default function WorkoutsPage() {
     setTab(t)
     localStorage.setItem(TAB_STORAGE_KEY, t)
   }
+
+  const editingTemplate = tab === 'build' ? navState?.editingTemplate : undefined
 
   return (
     <div className="max-w-lg mx-auto">
@@ -708,7 +611,7 @@ export default function WorkoutsPage() {
       </div>
 
       {tab === 'generate' && <GenerateTab />}
-      {tab === 'build' && <BuildTab />}
+      {tab === 'build' && <BuildTab editingTemplate={editingTemplate} />}
       {tab === 'templates' && <TemplatesTab />}
     </div>
   )

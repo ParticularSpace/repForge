@@ -59,6 +59,31 @@ export function useDeleteTemplate() {
   })
 }
 
+export function useUpdateTemplate() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: {
+      id: string
+      data: {
+        name: string
+        type?: string
+        exercises: Array<{
+          name: string
+          order: number
+          sets: number
+          reps: number
+          weightLbs?: number
+          restSeconds?: number
+          muscleGroups?: string[]
+        }>
+      }
+    }) => api.put<WorkoutTemplate>(`/api/v1/templates/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['templates'] })
+    },
+  })
+}
+
 export function useStartTemplate() {
   const queryClient = useQueryClient()
   return useMutation({

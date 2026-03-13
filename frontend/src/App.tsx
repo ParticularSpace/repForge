@@ -10,6 +10,7 @@ import WorkoutPreviewPage from '@/pages/WorkoutPreviewPage'
 import ActiveWorkoutPage from '@/pages/ActiveWorkoutPage'
 import WorkoutSummaryPage from '@/pages/WorkoutSummaryPage'
 import WorkoutsPage from '@/pages/WorkoutsPage'
+import TemplateDetailPage from '@/pages/TemplateDetailPage'
 
 function AuthGuard() {
   const { user, loading } = useAuth()
@@ -46,6 +47,7 @@ export default function App() {
         <Route path="/workout/:id/active" element={<ActiveWorkoutPage />} />
         <Route path="/workout/:id/summary" element={<WorkoutSummaryPage />} />
         <Route path="/profile/equipment" element={<EquipmentPage />} />
+        <Route path="/workouts/templates/:templateId" element={<TemplateDetailPage />} />
       </Route>
     </Routes>
   )
