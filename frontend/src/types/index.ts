@@ -19,6 +19,10 @@ export interface ExercisePlan {
   reps: number
   weightLbs?: number
   notes?: string
+  description?: string
+  muscleGroups?: string[]
+  modification?: string | null
+  coachingCue?: string | null
 }
 
 export interface WorkoutPlan {
@@ -44,6 +48,10 @@ export interface Exercise {
   reps: number
   weightLbs?: number
   notes?: string
+  description?: string
+  muscleGroups?: string[]
+  modification?: string | null
+  coachingCue?: string | null
   setLogs?: SetLog[]
 }
 
@@ -52,8 +60,19 @@ export interface ProfileStats {
   totalSets: number
   totalMinutes: number
   currentStreak: number
+  longestStreak: number
   favoriteType: string | null
   thisWeekWorkouts: number
+  workoutsThisMonth: number
+  avgWorkoutDuration: number
+  totalWeightLifted: number
+  mostFrequentDay: string | null
+  personalRecords: Array<{
+    exerciseName: string
+    weightLbs: number
+    reps: number
+    date: string
+  }>
   recentWorkouts: Array<{
     id: string
     name: string
@@ -62,6 +81,27 @@ export interface ProfileStats {
     durationMin: number | null
     exerciseCount: number
   }>
+}
+
+export interface Achievement {
+  id: string
+  name: string
+  description: string
+  icon: string
+  earnedAt: string | null
+  progress: number
+  progressLabel: string
+}
+
+export interface AchievementsResponse {
+  achievements: Achievement[]
+  level: {
+    current: number
+    name: string
+    xp: number
+    xpToNext: number
+    progressPercent: number
+  }
 }
 
 export interface Workout {

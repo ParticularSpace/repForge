@@ -5,6 +5,7 @@ import LoginPage from '@/pages/LoginPage'
 import ResetPasswordPage from '@/pages/ResetPasswordPage'
 import HomePage from '@/pages/HomePage'
 import ProfilePage from '@/pages/ProfilePage'
+import EquipmentPage from '@/pages/EquipmentPage'
 import WorkoutPreviewPage from '@/pages/WorkoutPreviewPage'
 import ActiveWorkoutPage from '@/pages/ActiveWorkoutPage'
 import WorkoutSummaryPage from '@/pages/WorkoutSummaryPage'
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="/workout/preview" element={<WorkoutPreviewPage />} />
         <Route path="/workout/:id/active" element={<ActiveWorkoutPage />} />
         <Route path="/workout/:id/summary" element={<WorkoutSummaryPage />} />
+        <Route path="/profile/equipment" element={<EquipmentPage />} />
       </Route>
     </Routes>
   )

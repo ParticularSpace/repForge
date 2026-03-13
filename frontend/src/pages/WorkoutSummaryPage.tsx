@@ -1,10 +1,62 @@
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useWorkout } from '@/hooks/useWorkouts'
+import { useWorkout, useAchievements } from '@/hooks/useWorkouts'
+
+const STORED_ACHIEVEMENTS_KEY = 'reptrack_earned_achievements'
+
+function loadStoredAchievementIds(): string[] {
+  try { return JSON.parse(localStorage.getItem(STORED_ACHIEVEMENTS_KEY) ?? '[]') } catch { return [] }
+}
 
 export default function WorkoutSummaryPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { data: workout, isLoading } = useWorkout(id)
+  const { data: achievementsData } = useAchievements()
+
+  const [newAchievements, setNewAchievements] = useState<string[]>([])
+  const [bannerIndex, setBannerIndex] = useState(0)
+  const [bannerVisible, setBannerVisible] = useState(false)
+  const checkedRef = useRef(false)
+
+  useEffect(() => {
+    if (!achievementsData || checkedRef.current) return
+    checkedRef.current = true
+
+    const storedIds = loadStoredAchievementIds()
+    const earnedIds = achievementsData.achievements
+      .filter(a => a.earnedAt !== null)
+      .map(a => a.id)
+
+    // Only show celebration if user has prior stored achievements (not first-ever load)
+    if (storedIds.length === 0) {
+      // First time: just store what's earned, don't celebrate
+      localStorage.setItem(STORED_ACHIEVEMENTS_KEY, JSON.stringify(earnedIds))
+      return
+    }
+
+    const newlyEarned = earnedIds.filter(id => !storedIds.includes(id))
+    if (newlyEarned.length > 0) {
+      setNewAchievements(newlyEarned)
+      setBannerVisible(true)
+    }
+
+    // Update stored list
+    localStorage.setItem(STORED_ACHIEVEMENTS_KEY, JSON.stringify(earnedIds))
+  }, [achievementsData])
+
+  // Cycle through banners sequentially, 4 seconds each
+  useEffect(() => {
+    if (!bannerVisible || newAchievements.length === 0) return
+    const timer = setTimeout(() => {
+      if (bannerIndex + 1 < newAchievements.length) {
+        setBannerIndex(i => i + 1)
+      } else {
+        setBannerVisible(false)
+      }
+    }, 4000)
+    return () => clearTimeout(timer)
+  }, [bannerVisible, bannerIndex, newAchievements.length])
 
   if (isLoading) {
     return (
@@ -19,8 +71,25 @@ export default function WorkoutSummaryPage() {
   const exercises = workout.exercises ?? []
   const totalSets = exercises.reduce((sum, ex) => sum + (ex.setLogs?.length ?? 0), 0)
 
+  const currentBannerAchievementId = newAchievements[bannerIndex]
+  const currentBannerAchievement = achievementsData?.achievements.find(a => a.id === currentBannerAchievementId)
+
   return (
     <div className="min-h-dvh bg-gray-50 flex flex-col">
+      {/* Achievement unlock banner */}
+      {bannerVisible && currentBannerAchievement && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-teal-600 text-white px-4 py-3 text-center text-sm font-semibold shadow-lg animate-slide-down">
+          🏆 Achievement unlocked: {currentBannerAchievement.name}!
+          <style>{`
+            @keyframes slideDown {
+              from { transform: translateY(-100%); }
+              to { transform: translateY(0); }
+            }
+            .animate-slide-down { animation: slideDown 0.3s ease-out; }
+          `}</style>
+        </div>
+      )}
+
       {/* Hero — pt-safe clears the status bar */}
       <div className="bg-teal-600 px-5 pt-safe text-white">
         <div className="pt-10 pb-8 text-center">

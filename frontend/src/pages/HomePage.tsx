@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useWorkouts, useGenerateWorkout } from '@/hooks/useWorkouts'
 import { api } from '@/lib/api'
 import Chip from '@/components/ui/Chip'
@@ -210,6 +210,12 @@ export default function HomePage() {
             {(generate.error as Error).message}
           </p>
         )}
+
+        <p className="mt-3 text-center">
+          <Link to="/profile/equipment" className="text-xs text-teal-600 hover:underline">
+            Edit equipment preferences →
+          </Link>
+        </p>
       </div>
 
       {/* Recent workouts */}

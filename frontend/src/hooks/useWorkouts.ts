@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import type { Workout, WorkoutPlan, WorkoutType, Difficulty, PersonalInfo, ProfileStats } from '@/types'
+import type { Workout, WorkoutPlan, WorkoutType, Difficulty, PersonalInfo, ProfileStats, AchievementsResponse } from '@/types'
 
 export function useProfileStats() {
   return useQuery({
     queryKey: ['profile-stats'],
     queryFn: () => api.get<ProfileStats>('/api/v1/profile/stats'),
+    staleTime: 0,
   })
 }
 
@@ -46,9 +47,19 @@ export function useCompleteWorkout() {
     mutationFn: ({ id, completedAt, durationMin }: { id: string; completedAt: string; durationMin: number }) =>
       api.patch<{ success: boolean }>(`/api/v1/workouts/${id}`, { completedAt, durationMin }),
     onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: ['profile-stats'] })
+      qc.invalidateQueries({ queryKey: ['achievements'] })
       qc.invalidateQueries({ queryKey: ['workouts'] })
       qc.invalidateQueries({ queryKey: ['workouts', id] })
     },
+  })
+}
+
+export function useAchievements() {
+  return useQuery({
+    queryKey: ['achievements'],
+    queryFn: () => api.get<AchievementsResponse>('/api/v1/profile/achievements'),
+    staleTime: 0,
   })
 }
 

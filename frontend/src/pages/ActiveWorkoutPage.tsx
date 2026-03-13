@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useWorkout, useCompleteWorkout, useLogSet } from '@/hooks/useWorkouts'
 import ExerciseCard from '@/components/workout/ExerciseCard'
 import RestTimer from '@/components/workout/RestTimer'
+import ExerciseInfoModal from '@/components/workout/ExerciseInfoModal'
+import type { Exercise } from '@/types'
 
 function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0')
@@ -22,6 +24,7 @@ export default function ActiveWorkoutPage() {
   const [showRest, setShowRest] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const [showEndConfirm, setShowEndConfirm] = useState(false)
+  const [infoExercise, setInfoExercise] = useState<Exercise | null>(null)
   const elapsedRef = useRef(0)
 
   useEffect(() => {
@@ -122,6 +125,7 @@ export default function ActiveWorkoutPage() {
             exercise={currentEx}
             completedSets={doneSets}
             onSetTap={handleSetTap}
+            onNameTap={() => setInfoExercise(currentEx)}
           />
 
           {showRest && (
@@ -195,6 +199,10 @@ export default function ActiveWorkoutPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {infoExercise && (
+        <ExerciseInfoModal exercise={infoExercise} onClose={() => setInfoExercise(null)} />
       )}
     </div>
   )

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useCreateWorkout, useGenerateWorkout } from '@/hooks/useWorkouts'
-import type { WorkoutPlan, WorkoutType, Difficulty } from '@/types'
+import ExerciseInfoModal from '@/components/workout/ExerciseInfoModal'
+import type { WorkoutPlan, WorkoutType, Difficulty, ExercisePlan } from '@/types'
 
 interface PreviewState {
   plan: WorkoutPlan
@@ -20,6 +21,17 @@ export default function WorkoutPreviewPage() {
   const [selected, setSelected] = useState<Set<number>>(() =>
     new Set(state?.plan.exercises.map((_, i) => i) ?? [])
   )
+  const [infoExercise, setInfoExercise] = useState<ExercisePlan | null>(null)
+  const [expandedMods, setExpandedMods] = useState<Set<number>>(new Set())
+
+  const toggleMod = (i: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setExpandedMods(prev => {
+      const next = new Set(prev)
+      next.has(i) ? next.delete(i) : next.add(i)
+      return next
+    })
+  }
 
   if (!state) {
     navigate('/')
@@ -60,6 +72,7 @@ export default function WorkoutPreviewPage() {
     : null
 
   return (
+    <>
     <div className="min-h-dvh bg-gray-50 flex flex-col">
       {/* Header with notch clearance */}
       <div className="bg-white border-b border-gray-100 pt-safe">
@@ -112,15 +125,45 @@ export default function WorkoutPreviewPage() {
                         </svg>
                       )}
                     </div>
-                    <div className="flex-1 min-w-0 pr-3">
-                      <p className={`font-semibold text-gray-900 ${!isSelected ? 'line-through text-gray-400' : ''}`}>
-                        {ex.name}
-                      </p>
+                    <div className="flex-1 min-w-0 pr-1">
+                      <div className="flex items-center gap-1.5">
+                        <p className={`font-semibold text-gray-900 ${!isSelected ? 'line-through text-gray-400' : ''}`}>
+                          {ex.name}
+                        </p>
+                        {(ex.description || (ex.muscleGroups && ex.muscleGroups.length > 0)) && (
+                          <button
+                            onClick={e => { e.stopPropagation(); setInfoExercise(ex) }}
+                            className="text-gray-300 hover:text-teal-500 transition-colors shrink-0 text-base leading-none"
+                            aria-label={`Info about ${ex.name}`}
+                          >
+                            ⓘ
+                          </button>
+                        )}
+                      </div>
                       <p className="text-sm text-gray-400 mt-0.5">
                         {ex.sets} sets × {ex.reps} reps
                         {ex.weightLbs ? ` · ${ex.weightLbs} lbs` : ''}
                       </p>
-                      {ex.notes && <p className="text-xs italic text-gray-400 mt-1.5">{ex.notes}</p>}
+                      {ex.notes && !ex.coachingCue && (
+                        <p className="text-xs italic text-gray-400 mt-1.5">{ex.notes}</p>
+                      )}
+                      {ex.coachingCue && (
+                        <p className="text-xs italic text-gray-400 mt-1.5">"{ex.coachingCue}"</p>
+                      )}
+                      {ex.modification && (
+                        <div className="mt-2">
+                          <button
+                            onClick={e => toggleMod(i, e)}
+                            className="text-xs text-gray-400 hover:text-teal-600 transition-colors flex items-center gap-1"
+                          >
+                            <span className={`inline-block transition-transform duration-150 ${expandedMods.has(i) ? 'rotate-90' : ''}`}>›</span>
+                            Too hard?
+                          </button>
+                          {expandedMods.has(i) && (
+                            <p className="text-xs text-gray-500 mt-1 pl-3 border-l-2 border-gray-200">{ex.modification}</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <span className="text-xs font-medium text-gray-300 mt-0.5 shrink-0">#{ex.order}</span>
                   </div>
@@ -158,5 +201,10 @@ export default function WorkoutPreviewPage() {
         </div>
       </div>
     </div>
+
+    {infoExercise && (
+      <ExerciseInfoModal exercise={infoExercise} onClose={() => setInfoExercise(null)} />
+    )}
+    </>
   )
 }

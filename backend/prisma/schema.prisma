@@ -9,11 +9,12 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt      @map("updated_at")
+  id                   String   @id @default(uuid())
+  email                String   @unique
+  name                 String?
+  equipmentPreferences Json?    @map("equipment_preferences") @default("[]")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt      @map("updated_at")
   @@map("users")
 }
 
@@ -31,16 +32,20 @@ model Workout {
 }
 
 model Exercise {
-  id        String   @id @default(uuid())
-  workoutId String   @map("workout_id")
-  workout   Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
-  name      String
-  order     Int
-  sets      Int
-  reps      Int
-  weightLbs Float?   @map("weight_lbs")
-  notes     String?
-  setLogs   SetLog[]
+  id           String   @id @default(uuid())
+  workoutId    String   @map("workout_id")
+  workout      Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  name         String
+  order        Int
+  sets         Int
+  reps         Int
+  weightLbs    Float?   @map("weight_lbs")
+  notes        String?
+  description  String?
+  muscleGroups Json?    @map("muscle_groups") @default("[]")
+  modification String?
+  coachingCue  String?  @map("coaching_cue")
+  setLogs      SetLog[]
   @@map("exercises")
 }
 
