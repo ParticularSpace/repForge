@@ -9,6 +9,7 @@ import EquipmentPage from '@/pages/EquipmentPage'
 import WorkoutPreviewPage from '@/pages/WorkoutPreviewPage'
 import ActiveWorkoutPage from '@/pages/ActiveWorkoutPage'
 import WorkoutSummaryPage from '@/pages/WorkoutSummaryPage'
+import WorkoutsPage from '@/pages/WorkoutsPage'
 
 function AuthGuard() {
   const { user, loading } = useAuth()
@@ -35,6 +36,7 @@ export default function App() {
       {/* Routes with the main Layout (header + bottom nav) */}
       <Route element={user ? <Layout /> : <Navigate to="/login" />}>
         <Route path="/" element={<HomePage />} />
+        <Route path="/workouts" element={<WorkoutsPage />} />
         <Route path="/profile" element={<ProfilePage />} />
       </Route>
 

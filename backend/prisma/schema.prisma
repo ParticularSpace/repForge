@@ -67,3 +67,43 @@ model SetLog {
   actualWeight  Float?   @map("actual_weight")
   @@map("set_logs")
 }
+
+model ExerciseLibrary {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  muscleGroups Json     @map("muscle_groups") @default("[]")
+  description  String?
+  equipment    String?
+  isCustom     Boolean  @default(false) @map("is_custom")
+  createdBy    String?  @map("created_by")
+  @@map("exercise_library")
+}
+
+model WorkoutTemplate {
+  id         String             @id @default(uuid())
+  userId     String             @map("user_id")
+  name       String
+  type       String?
+  source     String             @default("manual")
+  createdAt  DateTime           @default(now()) @map("created_at")
+  updatedAt  DateTime           @updatedAt @map("updated_at")
+  lastUsedAt DateTime?          @map("last_used_at")
+  useCount   Int                @default(0) @map("use_count")
+  exercises  TemplateExercise[]
+  @@unique([userId, name, source])
+  @@map("workout_templates")
+}
+
+model TemplateExercise {
+  id           String          @id @default(uuid())
+  templateId   String          @map("template_id")
+  template     WorkoutTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  name         String
+  order        Int
+  sets         Int
+  reps         Int
+  weightLbs    Float?          @map("weight_lbs")
+  restSeconds  Int?            @map("rest_seconds")
+  muscleGroups Json?           @map("muscle_groups") @default("[]")
+  @@map("template_exercises")
+}

@@ -31,6 +31,7 @@ export interface ExercisePlan {
   sets: number
   reps: number
   weightLbs?: number
+  restSeconds?: number
   notes?: string
   description?: string
   muscleGroups?: string[]
@@ -136,4 +137,41 @@ export interface Workout {
   durationMin?: number
   _count?: { exercises: number }
   exercises?: Exercise[]
+}
+
+export interface LibraryExercise {
+  id: string
+  name: string
+  muscleGroups: string[]
+  description: string
+  equipment: string
+  isCustom: boolean
+}
+
+export interface TemplateExercise {
+  id: string
+  name: string
+  order: number
+  sets: number
+  reps: number
+  weightLbs?: number | null
+  restSeconds?: number | null
+  muscleGroups: string[]
+}
+
+export interface WorkoutTemplate {
+  id: string
+  name: string
+  type: string | null
+  source: 'manual' | 'ai'
+  createdAt: string
+  updatedAt: string
+  lastUsedAt: string | null
+  useCount: number
+  exercises: TemplateExercise[]
+}
+
+export interface TemplatesResponse {
+  manual: WorkoutTemplate[]
+  ai: WorkoutTemplate[]
 }

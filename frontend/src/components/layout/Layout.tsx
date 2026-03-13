@@ -10,6 +10,21 @@ function HomeIcon({ active }: { active: boolean }) {
   )
 }
 
+function WorkoutsIcon({ active }: { active: boolean }) {
+  const c = active ? '#0d9488' : '#9ca3af'
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="5" cy="12" r="2" />
+      <circle cx="19" cy="12" r="2" />
+      <line x1="7" y1="12" x2="17" y2="12" />
+      <line x1="2" y1="12" x2="5" y2="12" />
+      <line x1="19" y1="12" x2="22" y2="12" />
+      <line x1="5" y1="9" x2="5" y2="15" />
+      <line x1="19" y1="9" x2="19" y2="15" />
+    </svg>
+  )
+}
+
 function ProfileIcon({ active }: { active: boolean }) {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={active ? '#0d9488' : '#9ca3af'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -50,6 +65,12 @@ export default function Layout() {
           {({ isActive }) => (<>
             <HomeIcon active={isActive} />
             <span className={`text-xs font-medium ${isActive ? 'text-teal-600' : 'text-gray-400'}`}>Home</span>
+          </>)}
+        </NavLink>
+        <NavLink to="/workouts" className="flex-1 flex flex-col items-center justify-center py-3 gap-1">
+          {({ isActive }) => (<>
+            <WorkoutsIcon active={isActive} />
+            <span className={`text-xs font-medium ${isActive ? 'text-teal-600' : 'text-gray-400'}`}>Workouts</span>
           </>)}
         </NavLink>
         <NavLink to="/profile" className="flex-1 flex flex-col items-center justify-center py-3 gap-1">

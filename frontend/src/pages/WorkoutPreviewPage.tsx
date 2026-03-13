@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useCreateWorkout, useGenerateWorkout } from '@/hooks/useWorkouts'
+import { useCreateWorkout, useGenerateWorkout, useProfile } from '@/hooks/useWorkouts'
 import ExerciseInfoModal from '@/components/workout/ExerciseInfoModal'
+import EditExerciseModal from '@/components/workout/EditExerciseModal'
+import { formatWeight } from '@/lib/formatWeight'
 import type { WorkoutPlan, WorkoutType, Difficulty, ExercisePlan } from '@/types'
 
 interface PreviewState {
@@ -17,11 +19,14 @@ export default function WorkoutPreviewPage() {
 
   const create = useCreateWorkout()
   const generate = useGenerateWorkout()
+  const { data: profile } = useProfile()
 
+  const [plan, setPlan] = useState<WorkoutPlan>(() => state?.plan ?? { name: '', exercises: [] })
   const [selected, setSelected] = useState<Set<number>>(() =>
     new Set(state?.plan.exercises.map((_, i) => i) ?? [])
   )
   const [infoExercise, setInfoExercise] = useState<ExercisePlan | null>(null)
+  const [editExercise, setEditExercise] = useState<{ ex: ExercisePlan; index: number } | null>(null)
   const [expandedMods, setExpandedMods] = useState<Set<number>>(new Set())
 
   const toggleMod = (i: number, e: React.MouseEvent) => {
@@ -38,7 +43,7 @@ export default function WorkoutPreviewPage() {
     return null
   }
 
-  const { plan, type, difficulty } = state
+  const { type, difficulty } = state
   const selectedCount = selected.size
   const MIN = 2
 
@@ -55,15 +60,26 @@ export default function WorkoutPreviewPage() {
     })
   }
 
+  const handleSaveExercise = (updated: ExercisePlan) => {
+    if (editExercise === null) return
+    setPlan(prev => ({
+      ...prev,
+      exercises: prev.exercises.map((ex, i) => i === editExercise.index ? updated : ex),
+    }))
+    setEditExercise(null)
+  }
+
   const handleStart = async () => {
     const exercises = plan.exercises.filter((_, i) => selected.has(i))
-    const workout = await create.mutateAsync({ name: plan.name, type, difficulty, exercises })
+    const workout = await create.mutateAsync({ name: plan.name, type, difficulty, exercises, source: 'ai' })
     navigate(`/workout/${workout.id}/active`, { replace: true })
   }
 
   const handleRegenerate = async () => {
     const newPlan = await generate.mutateAsync({ type, difficulty })
-    navigate('/workout/preview', { state: { plan: newPlan, type, difficulty }, replace: true })
+    setPlan(newPlan)
+    setSelected(new Set(newPlan.exercises.map((_, i) => i)))
+    setExpandedMods(new Set())
   }
 
   const isBusy = create.isPending || generate.isPending
@@ -139,10 +155,17 @@ export default function WorkoutPreviewPage() {
                             ⓘ
                           </button>
                         )}
+                        <button
+                          onClick={e => { e.stopPropagation(); setEditExercise({ ex, index: i }) }}
+                          className="text-gray-300 hover:text-teal-500 transition-colors shrink-0 text-sm leading-none"
+                          aria-label={`Edit ${ex.name}`}
+                        >
+                          ✏
+                        </button>
                       </div>
                       <p className="text-sm text-gray-400 mt-0.5">
                         {ex.sets} sets × {ex.reps} reps
-                        {ex.weightLbs ? ` · ${ex.weightLbs} lbs` : ''}
+                        {ex.weightLbs != null ? ` · ${formatWeight(ex.weightLbs)}` : ''}
                       </p>
                       {ex.notes && !ex.coachingCue && (
                         <p className="text-xs italic text-gray-400 mt-1.5">{ex.notes}</p>
@@ -204,6 +227,15 @@ export default function WorkoutPreviewPage() {
 
     {infoExercise && (
       <ExerciseInfoModal exercise={infoExercise} onClose={() => setInfoExercise(null)} />
+    )}
+
+    {editExercise && (
+      <EditExerciseModal
+        exercise={editExercise.ex}
+        defaultRestSeconds={profile?.preferredRestSeconds ?? 60}
+        onSave={handleSaveExercise}
+        onClose={() => setEditExercise(null)}
+      />
     )}
     </>
   )

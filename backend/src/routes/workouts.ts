@@ -13,7 +13,7 @@ interface PersonalInfo {
   notes?: string
 }
 
-const GENERATE_PROMPT = (type: string, difficulty: string, info?: PersonalInfo, equipmentPreferences?: string[]) => {
+const GENERATE_PROMPT = (type: string, difficulty: string, info?: PersonalInfo, equipmentPreferences?: string[], muscleFocus?: string[]) => {
   const lines: string[] = []
   if (info?.age)       lines.push(`Athlete age: ${info.age} years`)
   if (info?.weightLbs) lines.push(`Athlete weight: ${info.weightLbs} lbs`)
@@ -22,6 +22,9 @@ const GENERATE_PROMPT = (type: string, difficulty: string, info?: PersonalInfo, 
   if (info?.notes)     lines.push(`Additional context: ${info.notes}`)
   if (equipmentPreferences && equipmentPreferences.length > 0) {
     lines.push(`Available equipment (only use exercises requiring these): ${equipmentPreferences.join(', ')}`)
+  }
+  if (muscleFocus && muscleFocus.length > 0) {
+    lines.push(`Muscle focus: ${muscleFocus.join(', ')}. Prioritise exercises that work these muscles. Include at least one compound movement for each focus muscle. Other exercises should complement, not replace.`)
   }
   const contextBlock = lines.length > 0 ? lines.join('\n') + '\n' : ''
 
@@ -165,10 +168,11 @@ General fitness: balanced mix of push, pull, and leg movements regardless of wor
 export async function workoutRoutes(app: FastifyInstance) {
   // POST /workouts/generate — returns plan without saving
   app.post('/workouts/generate', { preHandler: [authenticate] }, async (request, reply) => {
-    const { type, difficulty, personalInfo: overrides } = request.body as {
+    const { type, difficulty, personalInfo: overrides, muscleFocus } = request.body as {
       type: string
       difficulty: string
       personalInfo?: Partial<PersonalInfo>
+      muscleFocus?: string[]
     }
 
     // Fetch full user profile; merge with any overrides from request body
@@ -195,7 +199,7 @@ export async function workoutRoutes(app: FastifyInstance) {
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 4096,
-      messages: [{ role: 'user', content: GENERATE_PROMPT(type, difficulty, profileInfo, equipmentPreferences.length > 0 ? equipmentPreferences : undefined) }],
+      messages: [{ role: 'user', content: GENERATE_PROMPT(type, difficulty, profileInfo, equipmentPreferences.length > 0 ? equipmentPreferences : undefined, muscleFocus) }],
     })
 
     const content = response.content[0]
@@ -215,10 +219,11 @@ export async function workoutRoutes(app: FastifyInstance) {
   // POST /workouts — save workout + exercises to DB
   app.post('/workouts', { preHandler: [authenticate] }, async (request, reply) => {
     const user = request.user
-    const { name, type, difficulty, exercises } = request.body as {
+    const { name, type, difficulty, exercises, source } = request.body as {
       name: string
       type: string
       difficulty: string
+      source?: 'ai' | 'manual'
       exercises: Array<{
         name: string
         order: number
@@ -256,6 +261,55 @@ export async function workoutRoutes(app: FastifyInstance) {
       },
       include: { exercises: { orderBy: { order: 'asc' } } },
     })
+
+    // Auto-save AI workouts as templates
+    if (source === 'ai') {
+      await prisma.workoutTemplate.upsert({
+        where: { userId_name_source: { userId: user.id, name, source: 'ai' } },
+        update: {
+          type: type ?? null,
+          updatedAt: new Date(),
+          exercises: {
+            deleteMany: {},
+            create: exercises.map(ex => ({
+              name: ex.name,
+              order: ex.order,
+              sets: ex.sets,
+              reps: ex.reps,
+              weightLbs: ex.weightLbs ?? null,
+              muscleGroups: ex.muscleGroups ?? [],
+            })),
+          },
+        },
+        create: {
+          userId: user.id,
+          name,
+          type: type ?? null,
+          source: 'ai',
+          exercises: {
+            create: exercises.map(ex => ({
+              name: ex.name,
+              order: ex.order,
+              sets: ex.sets,
+              reps: ex.reps,
+              weightLbs: ex.weightLbs ?? null,
+              muscleGroups: ex.muscleGroups ?? [],
+            })),
+          },
+        },
+      })
+
+      // Prune AI templates beyond 10 most recently used
+      const excess = await prisma.workoutTemplate.findMany({
+        where: { userId: user.id, source: 'ai' },
+        orderBy: [{ lastUsedAt: 'desc' }, { createdAt: 'desc' }],
+        skip: 10,
+        select: { id: true },
+      })
+      if (excess.length > 0) {
+        await prisma.workoutTemplate.deleteMany({ where: { id: { in: excess.map(t => t.id) } } })
+      }
+    }
 
     return reply.status(201).send(workout)
   })

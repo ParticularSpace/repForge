@@ -46,15 +46,15 @@ export function useWorkout(id: string | undefined) {
 
 export function useGenerateWorkout() {
   return useMutation({
-    mutationFn: ({ type, difficulty, personalInfo }: { type: WorkoutType; difficulty: Difficulty; personalInfo?: PersonalInfo }) =>
-      api.post<WorkoutPlan>('/api/v1/workouts/generate', { type, difficulty, personalInfo }),
+    mutationFn: ({ type, difficulty, personalInfo, muscleFocus }: { type: WorkoutType; difficulty: Difficulty; personalInfo?: PersonalInfo; muscleFocus?: string[] }) =>
+      api.post<WorkoutPlan>('/api/v1/workouts/generate', { type, difficulty, personalInfo, muscleFocus }),
   })
 }
 
 export function useCreateWorkout() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: { name: string; type: WorkoutType; difficulty: Difficulty; exercises: WorkoutPlan['exercises'] }) =>
+    mutationFn: (body: { name: string; type: WorkoutType; difficulty: Difficulty; exercises: WorkoutPlan['exercises']; source?: 'ai' | 'manual' }) =>
       api.post<Workout>('/api/v1/workouts', body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['workouts'] }),
   })

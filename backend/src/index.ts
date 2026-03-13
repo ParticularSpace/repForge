@@ -6,6 +6,8 @@ import { userRoutes } from './routes/users'
 import { workoutRoutes } from './routes/workouts'
 import { profileRoutes } from './routes/profile'
 import { achievementRoutes } from './routes/achievements'
+import { exerciseRoutes } from './routes/exercises'
+import { templateRoutes } from './routes/templates'
 
 const app = Fastify({ logger: true })
 
@@ -19,6 +21,8 @@ async function main() {
   app.register(workoutRoutes, { prefix: '/api/v1' })
   app.register(profileRoutes, { prefix: '/api/v1' })
   app.register(achievementRoutes, { prefix: '/api/v1' })
+  app.register(exerciseRoutes, { prefix: '/api/v1' })
+  app.register(templateRoutes, { prefix: '/api/v1' })
 
   const port = Number(process.env.PORT ?? 3000)
   await app.listen({ port, host: '0.0.0.0' })
