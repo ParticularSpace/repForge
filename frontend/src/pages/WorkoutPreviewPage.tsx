@@ -157,10 +157,13 @@ export default function WorkoutPreviewPage() {
                         )}
                         <button
                           onClick={e => { e.stopPropagation(); setEditExercise({ ex, index: i }) }}
-                          className="text-gray-300 hover:text-teal-500 transition-colors shrink-0 text-sm leading-none"
+                          className="text-gray-300 hover:text-teal-500 transition-colors shrink-0 flex items-center justify-center min-w-[44px] min-h-[44px]"
                           aria-label={`Edit ${ex.name}`}
                         >
-                          ✏
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="8" cy="8" r="2.5"/>
+                            <path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7"/>
+                          </svg>
                         </button>
                       </div>
                       <p className="text-sm text-gray-400 mt-0.5">

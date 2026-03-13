@@ -285,15 +285,24 @@ export default function ProfilePage() {
       {achievementsData && (
         <div className="mb-5">
           <button
-            className="w-full flex items-center justify-between mb-3"
+            className="w-full flex items-center justify-between mb-3 min-h-[44px]"
             onClick={() => setAchievementsExpanded(v => !v)}
           >
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
               Achievements ({achievementsData.totalEarned}/{achievementsData.totalPossible})
             </p>
-            <span className={`text-gray-400 text-sm transition-transform duration-150 ${achievementsExpanded ? 'rotate-180' : ''}`}>
-              ▾
-            </span>
+            <svg
+              width="16" height="16" viewBox="0 0 16 16" fill="none"
+              stroke="currentColor" strokeWidth="1.5"
+              strokeLinecap="round" strokeLinejoin="round"
+              className="text-gray-400 shrink-0"
+              style={{
+                transform: achievementsExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s ease',
+              }}
+            >
+              <path d="M4 6l4 4 4-4" />
+            </svg>
           </button>
 
           {achievementsExpanded && (
@@ -310,24 +319,13 @@ export default function ProfilePage() {
       <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-4">
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Profile</p>
-          {!editing ? (
+          {!editing && (
             <button
               onClick={startEditing}
               className="text-sm font-semibold text-teal-600 hover:underline"
             >
               Edit
             </button>
-          ) : (
-            <div className="flex gap-3">
-              <button onClick={cancelEditing} className="text-sm text-gray-400 hover:text-gray-600">Cancel</button>
-              <button
-                onClick={saveEditing}
-                disabled={updateProfile.isPending}
-                className="text-sm font-semibold text-teal-600 hover:underline disabled:opacity-50"
-              >
-                {updateProfile.isPending ? 'Saving…' : 'Save'}
-              </button>
-            </div>
           )}
         </div>
 
@@ -393,7 +391,7 @@ export default function ProfilePage() {
                 value={editState.displayName}
                 onChange={e => patch('displayName', e.target.value)}
                 placeholder="e.g. Alex"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -404,7 +402,7 @@ export default function ProfilePage() {
                   value={editState.age}
                   onChange={e => patch('age', e.target.value)}
                   placeholder="25"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
                 />
               </div>
               <div>
@@ -414,7 +412,7 @@ export default function ProfilePage() {
                   value={editState.weightLbs}
                   onChange={e => patch('weightLbs', e.target.value)}
                   placeholder="160"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
                 />
               </div>
             </div>
@@ -442,7 +440,7 @@ export default function ProfilePage() {
               <select
                 value={editState.gender}
                 onChange={e => patch('gender', e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
               >
                 <option value="">Select…</option>
                 {GENDER_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
@@ -453,7 +451,7 @@ export default function ProfilePage() {
               <select
                 value={editState.fitnessGoal}
                 onChange={e => patch('fitnessGoal', e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
               >
                 <option value="">Select…</option>
                 {GOAL_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
@@ -466,7 +464,7 @@ export default function ProfilePage() {
                 onChange={e => patch('experienceNotes', e.target.value)}
                 placeholder="e.g. Bad left knee, prefer low impact"
                 rows={2}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
               />
             </div>
             <div>
@@ -476,8 +474,25 @@ export default function ProfilePage() {
                 value={editState.preferredRestSeconds}
                 onChange={e => patch('preferredRestSeconds', e.target.value)}
                 placeholder="60"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
+            </div>
+
+            {/* Save / Cancel — bottom of form */}
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={cancelEditing}
+                className="w-[40%] border border-gray-200 text-gray-600 rounded-xl py-3 font-medium text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveEditing}
+                disabled={updateProfile.isPending}
+                className="w-[60%] bg-teal-600 text-white rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
+              >
+                {updateProfile.isPending ? 'Saving…' : 'Save changes'}
+              </button>
             </div>
           </div>
         )}

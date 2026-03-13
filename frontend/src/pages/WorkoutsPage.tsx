@@ -165,7 +165,7 @@ function ExerciseSearchDropdown({
           value={query}
           onChange={e => { setQuery(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)}
-          className="flex-1 text-sm text-gray-900 placeholder-gray-400 outline-none bg-transparent"
+          className="flex-1 text-base text-gray-900 placeholder-gray-400 outline-none bg-transparent"
         />
         {isFetching && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-teal-500 border-t-transparent shrink-0" />}
       </div>
@@ -227,14 +227,14 @@ function AddCustomForm({ onDone }: { onDone: (ex: LibraryExercise) => void; onCa
         placeholder="Exercise name *"
         value={name}
         onChange={e => setName(e.target.value)}
-        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-2 outline-none focus:ring-1 focus:ring-teal-500"
+        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-base mb-2 outline-none focus:ring-1 focus:ring-teal-500"
       />
       <input
         type="text"
         placeholder="Equipment (e.g. Dumbbell)"
         value={equipment}
         onChange={e => setEquipment(e.target.value)}
-        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-3 outline-none focus:ring-1 focus:ring-teal-500"
+        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-base mb-3 outline-none focus:ring-1 focus:ring-teal-500"
       />
       <p className="text-xs font-semibold text-gray-500 mb-2">Muscle groups *</p>
       <div className="flex flex-wrap gap-2 mb-3">
@@ -398,7 +398,12 @@ function BuildTab() {
               <div className="flex items-center gap-1 shrink-0">
                 <button onClick={() => moveUp(i)} disabled={i === 0} className="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-gray-600 disabled:opacity-30 text-sm">↑</button>
                 <button onClick={() => moveDown(i)} disabled={i === exercises.length - 1} className="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-gray-600 disabled:opacity-30 text-sm">↓</button>
-                <button onClick={() => setEditTarget({ ex, index: i })} className="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-teal-500 text-sm">✏</button>
+                <button onClick={() => setEditTarget({ ex, index: i })} className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-300 hover:text-teal-500">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="8" cy="8" r="2.5"/>
+                    <path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7"/>
+                  </svg>
+                </button>
                 <button onClick={() => removeExercise(i)} className="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-red-400 text-sm">✕</button>
               </div>
             </div>
@@ -506,10 +511,13 @@ function TemplateEditMode({
             </div>
             <button
               onClick={() => setEditTarget(ex)}
-              className="text-gray-300 hover:text-teal-500 text-sm shrink-0"
+              className="text-gray-300 hover:text-teal-500 shrink-0 flex items-center justify-center min-w-[44px] min-h-[44px]"
               aria-label={`Edit ${ex.name}`}
             >
-              ✏
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="8" cy="8" r="2.5"/>
+                <path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7"/>
+              </svg>
             </button>
           </div>
         ))}

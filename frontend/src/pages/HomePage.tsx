@@ -123,7 +123,7 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              {workouts.map(w => (
+              {workouts.slice(0, 3).map(w => (
                 <div key={w.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center justify-between shadow-sm">
                   <div className="min-w-0">
                     <p className="font-semibold text-gray-900 text-sm truncate">{w.name}</p>
