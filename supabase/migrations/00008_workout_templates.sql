@@ -1,6 +1,6 @@
 create table public.workout_templates (
   id           uuid primary key default uuid_generate_v4(),
-  user_id      uuid not null references public.users(id),
+  user_id      text not null references public.users(id),
   name         text not null,
   type         text,
   source       text default 'manual',
@@ -27,11 +27,11 @@ alter table public.workout_templates enable row level security;
 alter table public.template_exercises enable row level security;
 
 create policy "Users manage own templates"
-  on public.workout_templates for all using (auth.uid() = user_id);
+  on public.workout_templates for all using (auth.uid()::text = user_id);
 
 create policy "Users manage own template exercises"
   on public.template_exercises for all using (
     template_id in (
-      select id from public.workout_templates where user_id = auth.uid()
+      select id from public.workout_templates where user_id = auth.uid()::text
     )
   );

@@ -5,5 +5,5 @@ create table public.exercise_library (
   description   text,
   equipment     text,
   is_custom     boolean default false,
-  created_by    uuid references public.users(id)
+  created_by    text references public.users(id)
 );
