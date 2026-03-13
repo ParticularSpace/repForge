@@ -7,6 +7,19 @@ export interface PersonalInfo {
   equipment?: string
   notes?: string
 }
+
+export interface UserProfile {
+  displayName: string | null
+  age: number | null
+  weightLbs: number | null
+  heightIn: number | null
+  gender: string | null
+  fitnessGoal: string | null
+  experienceNotes: string | null
+  preferredRestSeconds: number
+  equipment: string[]
+}
+
 export interface PaginatedResponse<T> extends ApiResponse<T[]> { total: number; page: number; pageSize: number }
 
 export type WorkoutType = 'push' | 'pull' | 'legs' | 'full_body' | 'cardio'
@@ -58,20 +71,15 @@ export interface Exercise {
 export interface ProfileStats {
   totalWorkouts: number
   totalSets: number
-  totalMinutes: number
   currentStreak: number
   longestStreak: number
-  favoriteType: string | null
-  thisWeekWorkouts: number
-  workoutsThisMonth: number
-  avgWorkoutDuration: number
   totalWeightLifted: number
-  mostFrequentDay: string | null
   personalRecords: Array<{
     exerciseName: string
     weightLbs: number
     reps: number
     date: string
+    workoutsSinceSet: number
   }>
   recentWorkouts: Array<{
     id: string
@@ -83,18 +91,31 @@ export interface ProfileStats {
   }>
 }
 
-export interface Achievement {
+export interface AchievementTier {
   id: string
   name: string
   description: string
   icon: string
+  threshold: number
+  earned: boolean
   earnedAt: string | null
   progress: number
   progressLabel: string
 }
 
+export interface AchievementChain {
+  id: string
+  name: string
+  tiers: AchievementTier[]
+  earnedCount: number
+  totalCount: number
+}
+
 export interface AchievementsResponse {
-  achievements: Achievement[]
+  chains: AchievementChain[]
+  totalEarned: number
+  totalPossible: number
+  topAchievement: { icon: string; name: string } | null
   level: {
     current: number
     name: string

@@ -12,6 +12,14 @@ model User {
   id                   String   @id @default(uuid())
   email                String   @unique
   name                 String?
+  displayName          String?  @map("display_name")
+  age                  Int?
+  weightLbs            Float?   @map("weight_lbs")
+  heightIn             Float?   @map("height_in")
+  gender               String?
+  fitnessGoal          String?  @map("fitness_goal")
+  experienceNotes      String?  @map("experience_notes")
+  preferredRestSeconds Int?     @map("preferred_rest_seconds") @default(60)
   equipmentPreferences Json?    @map("equipment_preferences") @default("[]")
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt      @map("updated_at")

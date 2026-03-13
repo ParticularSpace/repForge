@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useWorkout, useCompleteWorkout, useLogSet } from '@/hooks/useWorkouts'
+import { useWorkout, useCompleteWorkout, useLogSet, useProfile } from '@/hooks/useWorkouts'
 import ExerciseCard from '@/components/workout/ExerciseCard'
 import RestTimer from '@/components/workout/RestTimer'
 import ExerciseInfoModal from '@/components/workout/ExerciseInfoModal'
@@ -16,8 +16,10 @@ export default function ActiveWorkoutPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { data: workout, isLoading } = useWorkout(id)
+  const { data: profile } = useProfile()
   const complete = useCompleteWorkout()
   const logSet = useLogSet()
+  const restSeconds = profile?.preferredRestSeconds ?? 60
 
   const [currentExIdx, setCurrentExIdx] = useState(0)
   const [completedSets, setCompletedSets] = useState<Record<string, number>>({})
@@ -130,7 +132,7 @@ export default function ActiveWorkoutPage() {
 
           {showRest && (
             <RestTimer
-              seconds={60}
+              seconds={restSeconds}
               onComplete={handleRestDone}
               onSkip={handleRestDone}
             />

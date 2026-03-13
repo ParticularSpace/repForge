@@ -1,6 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import type { Workout, WorkoutPlan, WorkoutType, Difficulty, PersonalInfo, ProfileStats, AchievementsResponse } from '@/types'
+import type { Workout, WorkoutPlan, WorkoutType, Difficulty, PersonalInfo, ProfileStats, AchievementsResponse, UserProfile } from '@/types'
+
+export function useProfile() {
+  return useQuery({
+    queryKey: ['profile'],
+    queryFn: () => api.get<UserProfile>('/api/v1/profile'),
+    staleTime: 0,
+  })
+}
+
+export function useUpdateProfile() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Partial<UserProfile>) =>
+      api.patch<{ success: boolean }>('/api/v1/profile', body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['profile'] })
+    },
+  })
+}
 
 export function useProfileStats() {
   return useQuery({

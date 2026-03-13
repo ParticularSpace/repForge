@@ -2,133 +2,86 @@ import { FastifyInstance } from 'fastify'
 import { authenticate } from '../middleware/auth'
 import { prisma } from '../lib/prisma'
 
-interface AchievementDef {
+interface TierDef {
   id: string
   name: string
   description: string
   icon: string
-  check: (data: AchievementData) => { earned: boolean; progress: number; label: string }
+  threshold: number
+}
+
+interface ChainDef {
+  id: string
+  name: string
+  tiers: TierDef[]
+  getValue: (data: AchievementData) => number
 }
 
 interface AchievementData {
   totalWorkouts: number
   totalSets: number
-  currentStreak: number
   longestStreak: number
-  workoutsLast7Days: number
-  workoutsOver30Min: number
+  totalWeightLifted: number
+  uniquePrCount: number
 }
 
-const ACHIEVEMENT_DEFS: AchievementDef[] = [
+const CHAINS: ChainDef[] = [
   {
-    id: 'first_rep',
-    name: 'First rep',
-    description: 'Complete your first workout',
-    icon: '🏋️',
-    check: ({ totalWorkouts }) => ({
-      earned: totalWorkouts >= 1,
-      progress: Math.min(100, totalWorkouts * 100),
-      label: `${Math.min(totalWorkouts, 1)} of 1 workouts`,
-    }),
+    id: 'streak',
+    name: 'Streak',
+    getValue: d => d.longestStreak,
+    tiers: [
+      { id: 'streak_1', name: 'First fire',   description: 'Reach a 3-day streak',  icon: '🔥', threshold: 3  },
+      { id: 'streak_2', name: 'On a roll',    description: 'Reach a 7-day streak',  icon: '🔥', threshold: 7  },
+      { id: 'streak_3', name: 'Iron will',    description: 'Reach a 14-day streak', icon: '💪', threshold: 14 },
+      { id: 'streak_4', name: 'Unstoppable',  description: 'Reach a 21-day streak', icon: '⚡', threshold: 21 },
+      { id: 'streak_5', name: 'Streak king',  description: 'Reach a 30-day streak', icon: '👑', threshold: 30 },
+    ],
   },
   {
-    id: 'hat_trick',
-    name: 'Hat trick',
-    description: 'Complete 3 workouts',
-    icon: '🎯',
-    check: ({ totalWorkouts }) => ({
-      earned: totalWorkouts >= 3,
-      progress: Math.min(100, Math.round((totalWorkouts / 3) * 100)),
-      label: `${Math.min(totalWorkouts, 3)} of 3 workouts`,
-    }),
+    id: 'workouts',
+    name: 'Workouts',
+    getValue: d => d.totalWorkouts,
+    tiers: [
+      { id: 'workouts_1', name: 'First rep',   description: 'Complete your first workout',   icon: '🏋️', threshold: 1   },
+      { id: 'workouts_2', name: 'Hat trick',   description: 'Complete 5 workouts',           icon: '🎯', threshold: 5   },
+      { id: 'workouts_3', name: 'Consistent',  description: 'Complete 10 workouts',          icon: '🗓️', threshold: 10  },
+      { id: 'workouts_4', name: 'Dedicated',   description: 'Complete 25 workouts',          icon: '🏆', threshold: 25  },
+      { id: 'workouts_5', name: 'Legend',      description: 'Complete 50 workouts',          icon: '⭐', threshold: 50  },
+      { id: 'workouts_6', name: 'Elite',       description: 'Complete 100 workouts',         icon: '💎', threshold: 100 },
+    ],
   },
   {
-    id: 'on_a_roll',
-    name: 'On a roll',
-    description: 'Reach a 3-day streak',
-    icon: '🔥',
-    check: ({ longestStreak }) => ({
-      earned: longestStreak >= 3,
-      progress: Math.min(100, Math.round((longestStreak / 3) * 100)),
-      label: `${Math.min(longestStreak, 3)} of 3 days`,
-    }),
+    id: 'sets',
+    name: 'Sets',
+    getValue: d => d.totalSets,
+    tiers: [
+      { id: 'sets_1', name: 'Century',     description: 'Log 50 sets',    icon: '💯', threshold: 50   },
+      { id: 'sets_2', name: 'Iron reps',   description: 'Log 200 sets',   icon: '🔩', threshold: 200  },
+      { id: 'sets_3', name: 'Machine',     description: 'Log 500 sets',   icon: '⚙️', threshold: 500  },
+      { id: 'sets_4', name: 'Relentless',  description: 'Log 1,000 sets', icon: '🤖', threshold: 1000 },
+    ],
   },
   {
-    id: 'week_warrior',
-    name: 'Week warrior',
-    description: 'Complete 7 workouts in 7 days',
-    icon: '📅',
-    check: ({ workoutsLast7Days }) => ({
-      earned: workoutsLast7Days >= 7,
-      progress: Math.min(100, Math.round((workoutsLast7Days / 7) * 100)),
-      label: `${Math.min(workoutsLast7Days, 7)} of 7 workouts this week`,
-    }),
+    id: 'weight',
+    name: 'Weight lifted',
+    getValue: d => d.totalWeightLifted,
+    tiers: [
+      { id: 'weight_1', name: 'Stone lifter', description: 'Lift 1,000 lbs total',   icon: '🪨', threshold: 1000  },
+      { id: 'weight_2', name: 'Builder',      description: 'Lift 5,000 lbs total',   icon: '🏗️', threshold: 5000  },
+      { id: 'weight_3', name: 'Powerhouse',   description: 'Lift 15,000 lbs total',  icon: '🚛', threshold: 15000 },
+      { id: 'weight_4', name: 'Titan',        description: 'Lift 50,000 lbs total',  icon: '🚀', threshold: 50000 },
+    ],
   },
   {
-    id: 'iron_will',
-    name: 'Iron will',
-    description: 'Reach a 7-day streak',
-    icon: '💪',
-    check: ({ longestStreak }) => ({
-      earned: longestStreak >= 7,
-      progress: Math.min(100, Math.round((longestStreak / 7) * 100)),
-      label: `${Math.min(longestStreak, 7)} of 7 days`,
-    }),
-  },
-  {
-    id: 'century',
-    name: 'Century',
-    description: 'Complete 100 total sets',
-    icon: '💯',
-    check: ({ totalSets }) => ({
-      earned: totalSets >= 100,
-      progress: Math.min(100, Math.round((totalSets / 100) * 100)),
-      label: `${Math.min(totalSets, 100)} of 100 sets`,
-    }),
-  },
-  {
-    id: 'half_hour_hero',
-    name: 'Half hour hero',
-    description: 'Complete a workout over 30 minutes',
-    icon: '⏱️',
-    check: ({ workoutsOver30Min }) => ({
-      earned: workoutsOver30Min >= 1,
-      progress: Math.min(100, workoutsOver30Min * 100),
-      label: workoutsOver30Min >= 1 ? 'Completed!' : 'Not yet',
-    }),
-  },
-  {
-    id: 'consistent',
-    name: 'Consistent',
-    description: 'Complete 10 total workouts',
-    icon: '🗓️',
-    check: ({ totalWorkouts }) => ({
-      earned: totalWorkouts >= 10,
-      progress: Math.min(100, Math.round((totalWorkouts / 10) * 100)),
-      label: `${Math.min(totalWorkouts, 10)} of 10 workouts`,
-    }),
-  },
-  {
-    id: 'dedicated',
-    name: 'Dedicated',
-    description: 'Complete 25 total workouts',
-    icon: '🏆',
-    check: ({ totalWorkouts }) => ({
-      earned: totalWorkouts >= 25,
-      progress: Math.min(100, Math.round((totalWorkouts / 25) * 100)),
-      label: `${Math.min(totalWorkouts, 25)} of 25 workouts`,
-    }),
-  },
-  {
-    id: 'legend',
-    name: 'Legend',
-    description: 'Complete 50 total workouts',
-    icon: '⭐',
-    check: ({ totalWorkouts }) => ({
-      earned: totalWorkouts >= 50,
-      progress: Math.min(100, Math.round((totalWorkouts / 50) * 100)),
-      label: `${Math.min(totalWorkouts, 50)} of 50 workouts`,
-    }),
+    id: 'prs',
+    name: 'Personal records',
+    getValue: d => d.uniquePrCount,
+    tiers: [
+      { id: 'prs_1', name: 'Record breaker', description: 'Set your first PR',    icon: '🥉', threshold: 1  },
+      { id: 'prs_2', name: 'Achiever',       description: 'Set 5 different PRs',  icon: '🥈', threshold: 5  },
+      { id: 'prs_3', name: 'Champion',       description: 'Set 10 different PRs', icon: '🥇', threshold: 10 },
+    ],
   },
 ]
 
@@ -145,25 +98,22 @@ export async function achievementRoutes(app: FastifyInstance) {
   app.get('/profile/achievements', { preHandler: [authenticate] }, async (request) => {
     const userId = request.user.id
 
-    // Fetch all completed workouts with duration
-    const workouts = await prisma.workout.findMany({
-      where: { userId, completedAt: { not: null } },
-      select: { id: true, startedAt: true, completedAt: true, durationMin: true },
-      orderBy: { completedAt: 'desc' },
-    })
-
-    // Fetch all set logs in bulk — avoid N+1
-    const setLogs = await prisma.setLog.findMany({
-      where: { exercise: { workout: { userId } } },
-      select: { id: true },
-    })
+    const [workouts, setLogs] = await Promise.all([
+      prisma.workout.findMany({
+        where: { userId, completedAt: { not: null } },
+        select: { id: true, startedAt: true, completedAt: true, durationMin: true },
+        orderBy: { completedAt: 'desc' },
+      }),
+      prisma.setLog.findMany({
+        where: { exercise: { workout: { userId } } },
+        select: { actualWeight: true, actualReps: true, exercise: { select: { name: true } } },
+      }),
+    ])
 
     const DAY = 86400000
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    const sevenDaysAgo = new Date(today.getTime() - 7 * DAY)
 
-    // Use startedAt for streak calculation
     const uniqueDays = [...new Set(
       workouts.map(w => {
         const d = new Date(w.startedAt)
@@ -171,16 +121,6 @@ export async function achievementRoutes(app: FastifyInstance) {
         return d.getTime()
       })
     )].sort((a, b) => b - a)
-
-    // Current streak
-    let currentStreak = 0
-    let cursor = today.getTime()
-    for (const day of uniqueDays) {
-      if (day === cursor || day === cursor - DAY) {
-        currentStreak++
-        cursor = day
-      } else break
-    }
 
     // Longest streak
     let longestStreak = 0
@@ -196,24 +136,26 @@ export async function achievementRoutes(app: FastifyInstance) {
       prevDay = day
     }
 
-    const data: AchievementData = {
-      totalWorkouts: workouts.length,
-      totalSets: setLogs.length,
-      currentStreak,
-      longestStreak,
-      workoutsLast7Days: workouts.filter(w => new Date(w.startedAt) >= sevenDaysAgo).length,
-      workoutsOver30Min: workouts.filter(w => (w.durationMin ?? 0) > 30).length,
-    }
+    // Total weight lifted
+    const totalWeightLifted = setLogs.reduce((sum, s) => {
+      if (s.actualWeight && s.actualReps) return sum + s.actualWeight * s.actualReps
+      return sum
+    }, 0)
 
-    // Calculate XP from workout history (do not store XP, derive each time)
+    // Unique PRs (distinct exercises with at least one set logged with weight)
+    const uniquePrCount = new Set(
+      setLogs.filter(s => s.actualWeight).map(s => s.exercise.name)
+    ).size
+
+    // XP calculation
     let totalXp = 0
     for (const w of workouts) {
-      totalXp += 50 // Completing a workout
+      totalXp += 50
       const dur = w.durationMin ?? 0
       if (dur > 45) totalXp += 50
       else if (dur > 30) totalXp += 25
     }
-    totalXp += setLogs.length * 2 // Each set completed
+    totalXp += setLogs.length * 2
     if (longestStreak >= 7) totalXp += 100
     else if (longestStreak >= 3) totalXp += 30
 
@@ -222,32 +164,93 @@ export async function achievementRoutes(app: FastifyInstance) {
     for (let i = LEVELS.length - 1; i >= 0; i--) {
       if (totalXp >= LEVELS[i].minXp) { levelData = LEVELS[i]; break }
     }
-    const nextLevel = LEVELS[levelData.level] // levelData.level is 1-indexed, LEVELS is 0-indexed
+    const nextLevel = LEVELS[levelData.level]
     const xpToNext = nextLevel ? nextLevel.minXp - totalXp : 0
     const xpInCurrentLevel = totalXp - levelData.minXp
     const xpNeededForLevel = nextLevel ? nextLevel.minXp - levelData.minXp : 1
     const progressPercent = nextLevel ? Math.round((xpInCurrentLevel / xpNeededForLevel) * 100) : 100
 
-    // Build achievement list — earned first, then unearned
-    const now = new Date()
-    const results = ACHIEVEMENT_DEFS.map(def => {
-      const { earned, progress, label } = def.check(data)
-      return {
-        id: def.id,
-        name: def.name,
-        description: def.description,
-        icon: def.icon,
-        earnedAt: earned ? now.toISOString() : null,
-        progress,
-        progressLabel: label,
+    const data: AchievementData = {
+      totalWorkouts: workouts.length,
+      totalSets: setLogs.length,
+      longestStreak,
+      totalWeightLifted: Math.round(totalWeightLifted),
+      uniquePrCount,
+    }
+
+    const now = new Date().toISOString()
+
+    // Build chains — show only earned tiers + the next unearned tier
+    let topAchievement: { icon: string; name: string } | null = null
+    let topTierIndex = -1
+    let topChainOrder = -1
+
+    const chains = CHAINS.map((chain, chainOrder) => {
+      const value = chain.getValue(data)
+      const earnedCount = chain.tiers.filter(t => value >= t.threshold).length
+      const totalCount = chain.tiers.length
+
+      // Visible tiers: all earned + the very next unearned one
+      const nextUnearnedIdx = chain.tiers.findIndex(t => value < t.threshold)
+      const cutoff = nextUnearnedIdx === -1 ? totalCount : nextUnearnedIdx + 1
+
+      const visibleTiers = chain.tiers.slice(0, cutoff).map(t => ({
+        id: t.id,
+        name: t.name,
+        description: t.description,
+        icon: t.icon,
+        threshold: t.threshold,
+        earned: value >= t.threshold,
+        earnedAt: value >= t.threshold ? now : null,
+        progress: Math.min(100, Math.round((value / t.threshold) * 100)),
+        progressLabel: `${Math.min(value, t.threshold)} / ${t.threshold}`,
+      }))
+
+      // Track top achievement across all chains (furthest earned tier overall)
+      if (earnedCount > 0) {
+        const earnedTierIdx = earnedCount - 1
+        // Compare: prefer higher chain order first, then further tier in chain
+        if (chainOrder > topChainOrder || (chainOrder === topChainOrder && earnedTierIdx > topTierIndex)) {
+          const topTier = chain.tiers[earnedTierIdx]
+          topAchievement = { icon: topTier.icon, name: topTier.name }
+          topTierIndex = earnedTierIdx
+          topChainOrder = chainOrder
+        }
       }
+
+      return { id: chain.id, name: chain.name, tiers: visibleTiers, earnedCount, totalCount }
     })
 
-    const earned = results.filter(r => r.earnedAt !== null)
-    const unearned = results.filter(r => r.earnedAt === null)
+    // Pick the globally "best" topAchievement: highest earned tier across all chains
+    // (re-compute cleanly: find the last earned tier across all chains, sorted by tier absolute index)
+    let bestIcon: string | null = null
+    let bestName: string | null = null
+    let bestScore = -1
+    for (const chain of CHAINS) {
+      const value = chain.getValue(data)
+      for (let i = chain.tiers.length - 1; i >= 0; i--) {
+        if (value >= chain.tiers[i].threshold) {
+          // Score = chainIdx * 100 + tierIdx (so later chains + higher tiers win)
+          const score = CHAINS.indexOf(chain) * 100 + i
+          if (score > bestScore) {
+            bestScore = score
+            bestIcon = chain.tiers[i].icon
+            bestName = chain.tiers[i].name
+          }
+          break
+        }
+      }
+    }
+    const topAch = bestIcon ? { icon: bestIcon, name: bestName! } : null
+
+    const totalEarned = chains.reduce((sum, c) => sum + c.earnedCount, 0)
+    const totalPossible = chains.reduce((sum, c) => sum + c.totalCount, 0)
 
     return {
-      achievements: [...earned, ...unearned],
+      chains,
+      totalEarned,
+      totalPossible,
+      topAchievement: topAch,
       level: {
         current: levelData.level,
         name: levelData.name,

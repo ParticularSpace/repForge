@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { useWorkouts, useGenerateWorkout } from '@/hooks/useWorkouts'
+import { useWorkouts, useGenerateWorkout, useProfile } from '@/hooks/useWorkouts'
 import { api } from '@/lib/api'
 import Chip from '@/components/ui/Chip'
-import type { WorkoutType, Difficulty, Workout, PersonalInfo } from '@/types'
+import type { WorkoutType, Difficulty, Workout } from '@/types'
 
 const WORKOUT_TYPES: { value: WorkoutType; label: string }[] = [
   { value: 'push',      label: 'Push' },
@@ -19,15 +19,6 @@ const DIFFICULTIES: { value: Difficulty; label: string }[] = [
   { value: 'advanced',     label: 'Advanced' },
 ]
 
-const GOALS = ['Build muscle', 'Lose weight', 'Improve endurance', 'General fitness']
-const EQUIPMENT = ['Full gym', 'Dumbbells only', 'Bodyweight only']
-const STORAGE_KEY = 'reptrack_personal_info'
-const MAX_NOTES = 200
-
-function loadPersonalInfo(): PersonalInfo {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') } catch { return {} }
-}
-
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
@@ -40,31 +31,17 @@ export default function HomePage() {
   const [type, setType] = useState<WorkoutType>('push')
   const [difficulty, setDifficulty] = useState<Difficulty>('beginner')
   const [repeatLoading, setRepeatLoading] = useState<string | null>(null)
-  const [personalOpen, setPersonalOpen] = useState(false)
-  const [personal, setPersonal] = useState<PersonalInfo>(loadPersonalInfo)
-  const [saved, setSaved] = useState(false)
 
   const { data: workouts } = useWorkouts()
+  const { data: profile } = useProfile()
   const generate = useGenerateWorkout()
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(personal))
-    setSaved(true)
-    const t = setTimeout(() => setSaved(false), 1500)
-    return () => clearTimeout(t)
-  }, [personal])
-
-  const updatePersonal = (patch: Partial<PersonalInfo>) =>
-    setPersonal(prev => ({ ...prev, ...patch }))
-
-  const hasPersonal = Object.values(personal).some(v => v !== undefined && v !== '' && v !== null)
+  const greeting = profile?.displayName
+    ? `Hey ${profile.displayName}, ready to train?`
+    : 'Hey, ready to train?'
 
   const handleGenerate = async () => {
-    const plan = await generate.mutateAsync({
-      type,
-      difficulty,
-      personalInfo: hasPersonal ? personal : undefined,
-    })
+    const plan = await generate.mutateAsync({ type, difficulty })
     navigate('/workout/preview', { state: { plan, type, difficulty } })
   }
 
@@ -91,7 +68,7 @@ export default function HomePage() {
     <div className="max-w-lg mx-auto">
       {/* Greeting */}
       <div className="mb-5">
-        <h1 className="text-2xl font-bold text-gray-900">Hey, ready to train?</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{greeting}</h1>
         <p className="text-sm text-gray-400 mt-0.5">{fmtDay()}</p>
       </div>
 
@@ -110,88 +87,6 @@ export default function HomePage() {
             <Chip key={d.value} label={d.label} selected={difficulty === d.value} onClick={() => setDifficulty(d.value)} />
           ))}
         </div>
-
-        {/* Personalize toggle */}
-        <button
-          onClick={() => setPersonalOpen(o => !o)}
-          className="text-sm text-teal-600 font-medium mb-4 flex items-center gap-1"
-        >
-          Personalize your workout
-          <span className={`inline-block transition-transform duration-200 ${personalOpen ? 'rotate-90' : ''}`}>›</span>
-        </button>
-
-        {personalOpen && (
-          <div className="mb-5 space-y-3 border-t border-gray-50 pt-4">
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <label className="block text-xs font-medium text-gray-500 mb-1">Age (years)</label>
-                <input
-                  type="number"
-                  min={10} max={100}
-                  value={personal.age ?? ''}
-                  onChange={e => updatePersonal({ age: e.target.value ? Number(e.target.value) : undefined })}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-base focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
-                  placeholder="—"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="block text-xs font-medium text-gray-500 mb-1">Weight (lbs)</label>
-                <input
-                  type="number"
-                  min={50} max={500}
-                  value={personal.weightLbs ?? ''}
-                  onChange={e => updatePersonal({ weightLbs: e.target.value ? Number(e.target.value) : undefined })}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-base focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
-                  placeholder="—"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Goal</label>
-              <select
-                value={personal.goal ?? ''}
-                onChange={e => updatePersonal({ goal: e.target.value || undefined })}
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-base focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100 bg-white"
-              >
-                <option value="">Select goal…</option>
-                {GOALS.map(g => <option key={g} value={g}>{g}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Equipment</label>
-              <select
-                value={personal.equipment ?? ''}
-                onChange={e => updatePersonal({ equipment: e.target.value || undefined })}
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-base focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100 bg-white"
-              >
-                <option value="">Select equipment…</option>
-                {EQUIPMENT.map(eq => <option key={eq} value={eq}>{eq}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-medium text-gray-500">Notes</label>
-                <span className={`text-xs ${(personal.notes?.length ?? 0) >= MAX_NOTES ? 'text-red-400' : 'text-gray-300'}`}>
-                  {personal.notes?.length ?? 0}/{MAX_NOTES}
-                </span>
-              </div>
-              <textarea
-                value={personal.notes ?? ''}
-                onChange={e => updatePersonal({ notes: e.target.value.slice(0, MAX_NOTES) || undefined })}
-                rows={3}
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-base focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100 resize-none"
-                placeholder="e.g. bad knees, short on time, focus on upper body…"
-              />
-            </div>
-
-            {saved && (
-              <p className="text-xs text-teal-500 text-right">Saved</p>
-            )}
-          </div>
-        )}
 
         <button
           onClick={handleGenerate}

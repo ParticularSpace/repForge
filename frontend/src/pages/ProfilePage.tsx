@@ -1,23 +1,22 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { useProfileStats, useAchievements } from '@/hooks/useWorkouts'
+import { useProfileStats, useAchievements, useProfile, useUpdateProfile } from '@/hooks/useWorkouts'
+import type { AchievementChain, UserProfile } from '@/types'
 
-const STORAGE_KEY = 'reptrack_personal_info'
+const ACHIEVEMENTS_KEY = 'achievements_expanded'
 
-function getInitials(email: string) {
+function getInitials(displayName: string | null, email: string) {
+  if (displayName) return displayName.charAt(0).toUpperCase()
   return email.charAt(0).toUpperCase()
 }
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function fmtMemberSince(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-}
-
-function fmtHours(minutes: number) {
-  return (minutes / 60).toFixed(1)
 }
 
 function fmtWeight(lbs: number) {
@@ -25,12 +24,17 @@ function fmtWeight(lbs: number) {
   return `${lbs.toLocaleString()} lbs`
 }
 
-function fmtType(type: string) {
-  return type.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())
+function fmtHeight(heightIn: number) {
+  const ft = Math.floor(heightIn / 12)
+  const inches = Math.round(heightIn % 12)
+  return `${ft}'${inches}"`
 }
 
-function loadPersonal() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') } catch { return {} }
+function medalEmoji(index: number) {
+  if (index === 0) return '🥇'
+  if (index === 1) return '🥈'
+  if (index === 2) return '🥉'
+  return '🏅'
 }
 
 function StatCard({ value, label }: { value: string | number; label: string }) {
@@ -42,16 +46,141 @@ function StatCard({ value, label }: { value: string | number; label: string }) {
   )
 }
 
+function ChainRow({ chain }: { chain: AchievementChain }) {
+  const nextTier = chain.tiers.find(t => !t.earned)
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm font-semibold text-gray-900">{chain.name}</p>
+        <p className="text-xs text-gray-400">{chain.earnedCount}/{chain.totalCount}</p>
+      </div>
+
+      {/* Tier pills */}
+      <div className="flex flex-wrap gap-2 mb-3">
+        {chain.tiers.map(tier => (
+          <div
+            key={tier.id}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
+              tier.earned
+                ? 'bg-teal-50 text-teal-700 border border-teal-200'
+                : 'bg-gray-50 text-gray-400 border border-gray-200'
+            }`}
+            title={tier.description}
+          >
+            <span>{tier.icon}</span>
+            <span>{tier.name}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Progress toward next tier */}
+      {nextTier && (
+        <div>
+          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-teal-500 rounded-full transition-all duration-500"
+              style={{ width: `${nextTier.progress}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-400 mt-1">{nextTier.description} · {nextTier.progressLabel}</p>
+        </div>
+      )}
+      {!nextTier && (
+        <p className="text-xs text-teal-600 font-medium">All tiers unlocked!</p>
+      )}
+    </div>
+  )
+}
+
+const GENDER_OPTIONS = ['Male', 'Female', 'Non-binary', 'Prefer not to say']
+const GOAL_OPTIONS = ['Build muscle', 'Lose weight', 'Improve endurance', 'General fitness']
+
+interface EditState {
+  displayName: string
+  age: string
+  heightFt: string
+  heightIn: string
+  weightLbs: string
+  gender: string
+  fitnessGoal: string
+  experienceNotes: string
+  preferredRestSeconds: string
+}
+
+function profileToEdit(p: UserProfile): EditState {
+  const totalIn = p.heightIn ?? 0
+  return {
+    displayName: p.displayName ?? '',
+    age: p.age != null ? String(p.age) : '',
+    heightFt: totalIn > 0 ? String(Math.floor(totalIn / 12)) : '',
+    heightIn: totalIn > 0 ? String(Math.round(totalIn % 12)) : '',
+    weightLbs: p.weightLbs != null ? String(p.weightLbs) : '',
+    gender: p.gender ?? '',
+    fitnessGoal: p.fitnessGoal ?? '',
+    experienceNotes: p.experienceNotes ?? '',
+    preferredRestSeconds: p.preferredRestSeconds != null ? String(p.preferredRestSeconds) : '60',
+  }
+}
+
+function editToProfile(e: EditState): Partial<UserProfile> {
+  const heightFt = parseFloat(e.heightFt) || 0
+  const heightIn = parseFloat(e.heightIn) || 0
+  const totalHeightIn = heightFt * 12 + heightIn
+
+  return {
+    displayName: e.displayName.trim() || null,
+    age: e.age ? parseInt(e.age) : null,
+    heightIn: totalHeightIn > 0 ? totalHeightIn : null,
+    weightLbs: e.weightLbs ? parseFloat(e.weightLbs) : null,
+    gender: e.gender || null,
+    fitnessGoal: e.fitnessGoal || null,
+    experienceNotes: e.experienceNotes.trim() || null,
+    preferredRestSeconds: e.preferredRestSeconds ? parseInt(e.preferredRestSeconds) : 60,
+  }
+}
+
 export default function ProfilePage() {
   const { user } = useAuth()
-  const { data: stats, isLoading } = useProfileStats()
+  const { data: stats, isLoading: statsLoading } = useProfileStats()
   const { data: achievementsData } = useAchievements()
-  const personal = loadPersonal()
+  const { data: profile } = useProfile()
+  const updateProfile = useUpdateProfile()
+
+  const [achievementsExpanded, setAchievementsExpanded] = useState<boolean>(() => {
+    try { return localStorage.getItem(ACHIEVEMENTS_KEY) === 'true' } catch { return false }
+  })
+  const [editing, setEditing] = useState(false)
+  const [editState, setEditState] = useState<EditState | null>(null)
+
+  useEffect(() => {
+    try { localStorage.setItem(ACHIEVEMENTS_KEY, String(achievementsExpanded)) } catch { /* ignore */ }
+  }, [achievementsExpanded])
 
   const email = user?.email ?? ''
   const memberSince = user?.created_at ? fmtMemberSince(user.created_at) : ''
 
-  if (isLoading) {
+  const startEditing = () => {
+    if (profile) setEditState(profileToEdit(profile))
+    setEditing(true)
+  }
+
+  const cancelEditing = () => {
+    setEditing(false)
+    setEditState(null)
+  }
+
+  const saveEditing = async () => {
+    if (!editState) return
+    await updateProfile.mutateAsync(editToProfile(editState))
+    setEditing(false)
+    setEditState(null)
+  }
+
+  const patch = (key: keyof EditState, value: string) =>
+    setEditState(prev => prev ? { ...prev, [key]: value } : prev)
+
+  if (statsLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-teal-600 border-t-transparent" />
@@ -59,59 +188,41 @@ export default function ProfilePage() {
     )
   }
 
+  const topBadge = achievementsData?.topAchievement ?? null
+
   return (
     <div className="max-w-lg mx-auto pb-4">
+
       {/* Avatar + info */}
       <div className="flex items-center gap-4 mb-6">
-        <div className="h-14 w-14 rounded-full bg-teal-600 flex items-center justify-center text-white text-2xl font-bold shrink-0">
-          {getInitials(email)}
+        <div className="relative shrink-0">
+          <div className="h-14 w-14 rounded-full bg-teal-600 flex items-center justify-center text-white text-2xl font-bold">
+            {getInitials(profile?.displayName ?? null, email)}
+          </div>
+          {topBadge && (
+            <div className="absolute -bottom-0.5 -right-0.5 h-[26px] w-[26px] rounded-full bg-white border-2 border-white flex items-center justify-center text-sm shadow-sm">
+              {topBadge.icon}
+            </div>
+          )}
         </div>
-        <div className="min-w-0">
-          <p className="font-semibold text-gray-900 truncate">{email}</p>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-gray-900 truncate">
+            {profile?.displayName || email}
+          </p>
+          {profile?.displayName && (
+            <p className="text-xs text-gray-400 truncate">{email}</p>
+          )}
           {memberSince && <p className="text-xs text-gray-400 mt-0.5">Member since {memberSince}</p>}
         </div>
       </div>
 
-      {/* Streak banner */}
-      {stats && (
-        <div className={`border rounded-2xl px-4 py-3 mb-4 flex items-center gap-2 ${
-          stats.currentStreak >= 7
-            ? 'bg-amber-50 border-amber-100'
-            : stats.currentStreak > 0
-            ? 'bg-orange-50 border-orange-100'
-            : 'bg-gray-50 border-gray-100'
-        }`}>
-          <span className="text-xl">{stats.currentStreak > 0 ? '🔥' : '💤'}</span>
-          <p className={`text-sm font-semibold ${
-            stats.currentStreak >= 7 ? 'text-amber-700'
-            : stats.currentStreak > 0 ? 'text-orange-700'
-            : 'text-gray-400'
-          }`}>
-            {stats.currentStreak > 0
-              ? `${stats.currentStreak} day streak — keep it up!`
-              : 'Start a streak today'}
-          </p>
-        </div>
-      )}
-
-      {/* Favorite type pill */}
-      {stats?.favoriteType && (
-        <div className="mb-4">
-          <span className="inline-block bg-teal-50 text-teal-700 text-sm font-medium px-3 py-1.5 rounded-full">
-            Your go-to: {fmtType(stats.favoriteType)}
-          </span>
-        </div>
-      )}
-
-      {/* Stats grid */}
+      {/* 4-card stat grid */}
       {stats && (
         <div className="grid grid-cols-2 gap-3 mb-5">
           <StatCard value={stats.totalWorkouts} label="Total workouts" />
-          <StatCard value={`${fmtHours(stats.totalMinutes)} hrs`} label="Total time" />
-          <StatCard value={stats.workoutsThisMonth} label="This month" />
-          <StatCard value={stats.avgWorkoutDuration > 0 ? `${stats.avgWorkoutDuration} min` : '—'} label="Avg duration" />
-          <StatCard value={stats.totalWeightLifted > 0 ? fmtWeight(stats.totalWeightLifted) : '—'} label="Total weight lifted" />
           <StatCard value={stats.longestStreak > 0 ? `${stats.longestStreak} days` : '—'} label="Best streak" />
+          <StatCard value={stats.totalSets} label="Total sets" />
+          <StatCard value={stats.currentStreak > 0 ? `${stats.currentStreak} days` : '—'} label="Current streak" />
         </div>
       )}
 
@@ -143,20 +254,23 @@ export default function ProfilePage() {
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Personal records</p>
           {stats.personalRecords.length === 0 ? (
             <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-              <p className="text-sm text-gray-400">Complete a workout to see your records</p>
+              <p className="text-sm text-gray-400">Complete a weighted exercise to set your first PR</p>
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              {stats.personalRecords.map(pr => (
-                <div key={pr.exerciseName} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm flex items-center justify-between">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold text-gray-900 text-sm truncate">{pr.exerciseName}</p>
-                      <span className="shrink-0 text-xs font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">PR</span>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-0.5">{fmtDate(pr.date)}</p>
+              {stats.personalRecords.map((pr, idx) => (
+                <div key={pr.exerciseName} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm flex items-center gap-3">
+                  <span className="text-xl shrink-0">{medalEmoji(idx)}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm truncate">{pr.exerciseName}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {fmtDate(pr.date)}
+                      {pr.workoutsSinceSet > 0
+                        ? ` · ${pr.workoutsSinceSet} workout${pr.workoutsSinceSet !== 1 ? 's' : ''} ago`
+                        : ' · Last workout'}
+                    </p>
                   </div>
-                  <div className="text-right shrink-0 ml-3">
+                  <div className="text-right shrink-0">
                     <p className="text-sm font-bold text-gray-900">{pr.weightLbs} lbs</p>
                     <p className="text-xs text-gray-400">{pr.reps} reps</p>
                   </div>
@@ -167,62 +281,207 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Achievements */}
+      {/* Achievements — collapsible */}
       {achievementsData && (
         <div className="mb-5">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
-            Achievements ({achievementsData.achievements.filter(a => a.earnedAt).length}/{achievementsData.achievements.length})
-          </p>
-          <div className="flex flex-col gap-2">
-            {achievementsData.achievements.map(a => (
-              <div
-                key={a.id}
-                className={`bg-white rounded-2xl border p-4 shadow-sm transition-opacity ${
-                  a.earnedAt ? 'border-teal-200 opacity-100' : 'border-gray-100 opacity-40'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl shrink-0">{a.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-semibold text-gray-900 text-sm">{a.name}</p>
-                      {a.earnedAt && (
-                        <span className="text-xs text-teal-600 font-medium shrink-0">Earned</span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-400">{a.description}</p>
-                    {!a.earnedAt && (
-                      <div className="mt-2">
-                        <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-gray-400 rounded-full"
-                            style={{ width: `${a.progress}%` }}
-                          />
-                        </div>
-                        <p className="text-xs text-gray-400 mt-0.5">{a.progressLabel}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <button
+            className="w-full flex items-center justify-between mb-3"
+            onClick={() => setAchievementsExpanded(v => !v)}
+          >
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
+              Achievements ({achievementsData.totalEarned}/{achievementsData.totalPossible})
+            </p>
+            <span className={`text-gray-400 text-sm transition-transform duration-150 ${achievementsExpanded ? 'rotate-180' : ''}`}>
+              ▾
+            </span>
+          </button>
+
+          {achievementsExpanded && (
+            <div className="flex flex-col gap-3">
+              {achievementsData.chains.map(chain => (
+                <ChainRow key={chain.id} chain={chain} />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Personal info card */}
-      {(personal.age || personal.weightLbs || personal.goal || personal.equipment) && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-4">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Your profile</p>
-          <div className="space-y-1.5 text-sm text-gray-600">
-            {personal.age && <p>Age: <span className="font-medium text-gray-900">{personal.age} years</span></p>}
-            {personal.weightLbs && <p>Weight: <span className="font-medium text-gray-900">{personal.weightLbs} lbs</span></p>}
-            {personal.goal && <p>Goal: <span className="font-medium text-gray-900">{personal.goal}</span></p>}
-            {personal.equipment && <p>Equipment: <span className="font-medium text-gray-900">{personal.equipment}</span></p>}
-            {personal.notes && <p className="text-xs text-gray-400 italic mt-1">{personal.notes}</p>}
-          </div>
+      {/* Editable profile */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Profile</p>
+          {!editing ? (
+            <button
+              onClick={startEditing}
+              className="text-sm font-semibold text-teal-600 hover:underline"
+            >
+              Edit
+            </button>
+          ) : (
+            <div className="flex gap-3">
+              <button onClick={cancelEditing} className="text-sm text-gray-400 hover:text-gray-600">Cancel</button>
+              <button
+                onClick={saveEditing}
+                disabled={updateProfile.isPending}
+                className="text-sm font-semibold text-teal-600 hover:underline disabled:opacity-50"
+              >
+                {updateProfile.isPending ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          )}
         </div>
-      )}
+
+        {!editing && profile && (
+          <div className="space-y-2 text-sm">
+            {profile.displayName && (
+              <div className="flex justify-between">
+                <span className="text-gray-400">Display name</span>
+                <span className="font-medium text-gray-900">{profile.displayName}</span>
+              </div>
+            )}
+            {profile.age && (
+              <div className="flex justify-between">
+                <span className="text-gray-400">Age</span>
+                <span className="font-medium text-gray-900">{profile.age} yrs</span>
+              </div>
+            )}
+            {profile.heightIn && (
+              <div className="flex justify-between">
+                <span className="text-gray-400">Height</span>
+                <span className="font-medium text-gray-900">{fmtHeight(profile.heightIn)}</span>
+              </div>
+            )}
+            {profile.weightLbs && (
+              <div className="flex justify-between">
+                <span className="text-gray-400">Weight</span>
+                <span className="font-medium text-gray-900">{profile.weightLbs} lbs</span>
+              </div>
+            )}
+            {profile.gender && (
+              <div className="flex justify-between">
+                <span className="text-gray-400">Gender</span>
+                <span className="font-medium text-gray-900">{profile.gender}</span>
+              </div>
+            )}
+            {profile.fitnessGoal && (
+              <div className="flex justify-between">
+                <span className="text-gray-400">Goal</span>
+                <span className="font-medium text-gray-900">{profile.fitnessGoal}</span>
+              </div>
+            )}
+            {profile.experienceNotes && (
+              <p className="text-xs text-gray-400 italic pt-1">{profile.experienceNotes}</p>
+            )}
+            {profile.preferredRestSeconds && (
+              <div className="flex justify-between">
+                <span className="text-gray-400">Default rest</span>
+                <span className="font-medium text-gray-900">{profile.preferredRestSeconds}s</span>
+              </div>
+            )}
+            {!profile.displayName && !profile.age && !profile.heightIn && !profile.weightLbs && (
+              <p className="text-sm text-gray-400">Add your details to personalise workouts</p>
+            )}
+          </div>
+        )}
+
+        {editing && editState && (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Display name</label>
+              <input
+                type="text"
+                value={editState.displayName}
+                onChange={e => patch('displayName', e.target.value)}
+                placeholder="e.g. Alex"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Age</label>
+                <input
+                  type="number"
+                  value={editState.age}
+                  onChange={e => patch('age', e.target.value)}
+                  placeholder="25"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Weight (lbs)</label>
+                <input
+                  type="number"
+                  value={editState.weightLbs}
+                  onChange={e => patch('weightLbs', e.target.value)}
+                  placeholder="160"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Height</label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={editState.heightFt}
+                  onChange={e => patch('heightFt', e.target.value)}
+                  placeholder="5 ft"
+                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+                <input
+                  type="number"
+                  value={editState.heightIn}
+                  onChange={e => patch('heightIn', e.target.value)}
+                  placeholder="10 in"
+                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Gender</label>
+              <select
+                value={editState.gender}
+                onChange={e => patch('gender', e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+              >
+                <option value="">Select…</option>
+                {GENDER_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Fitness goal</label>
+              <select
+                value={editState.fitnessGoal}
+                onChange={e => patch('fitnessGoal', e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+              >
+                <option value="">Select…</option>
+                {GOAL_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Notes for trainer (optional)</label>
+              <textarea
+                value={editState.experienceNotes}
+                onChange={e => patch('experienceNotes', e.target.value)}
+                placeholder="e.g. Bad left knee, prefer low impact"
+                rows={2}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Default rest time (seconds)</label>
+              <input
+                type="number"
+                value={editState.preferredRestSeconds}
+                onChange={e => patch('preferredRestSeconds', e.target.value)}
+                placeholder="60"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Equipment row */}
       <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-5 flex items-center justify-between">

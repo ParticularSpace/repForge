@@ -2,7 +2,69 @@ import { FastifyInstance } from 'fastify'
 import { authenticate } from '../middleware/auth'
 import { prisma } from '../lib/prisma'
 
+interface UserProfileUpdate {
+  displayName?: string | null
+  age?: number | null
+  weightLbs?: number | null
+  heightIn?: number | null
+  gender?: string | null
+  fitnessGoal?: string | null
+  experienceNotes?: string | null
+  preferredRestSeconds?: number | null
+  equipment?: string[]
+}
+
 export async function profileRoutes(app: FastifyInstance) {
+  // GET /profile — return user's full profile
+  app.get('/profile', { preHandler: [authenticate] }, async (request) => {
+    const userId = request.user.id
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        displayName: true,
+        age: true,
+        weightLbs: true,
+        heightIn: true,
+        gender: true,
+        fitnessGoal: true,
+        experienceNotes: true,
+        preferredRestSeconds: true,
+        equipmentPreferences: true,
+      },
+    })
+    return {
+      displayName: user?.displayName ?? null,
+      age: user?.age ?? null,
+      weightLbs: user?.weightLbs ?? null,
+      heightIn: user?.heightIn ?? null,
+      gender: user?.gender ?? null,
+      fitnessGoal: user?.fitnessGoal ?? null,
+      experienceNotes: user?.experienceNotes ?? null,
+      preferredRestSeconds: user?.preferredRestSeconds ?? 60,
+      equipment: (user?.equipmentPreferences as string[] | null) ?? [],
+    }
+  })
+
+  // PATCH /profile — update user's profile fields
+  app.patch('/profile', { preHandler: [authenticate] }, async (request) => {
+    const userId = request.user.id
+    const body = request.body as UserProfileUpdate
+
+    const data: Record<string, unknown> = {}
+    if ('displayName' in body)          data.displayName = body.displayName
+    if ('age' in body)                  data.age = body.age
+    if ('weightLbs' in body)            data.weightLbs = body.weightLbs
+    if ('heightIn' in body)             data.heightIn = body.heightIn
+    if ('gender' in body)               data.gender = body.gender
+    if ('fitnessGoal' in body)          data.fitnessGoal = body.fitnessGoal
+    if ('experienceNotes' in body)      data.experienceNotes = body.experienceNotes
+    if ('preferredRestSeconds' in body) data.preferredRestSeconds = body.preferredRestSeconds
+    if ('equipment' in body)            data.equipmentPreferences = body.equipment
+
+    await prisma.user.update({ where: { id: userId }, data })
+    return { success: true }
+  })
+
   // GET /profile/equipment — return user's saved equipment preferences
   app.get('/profile/equipment', { preHandler: [authenticate] }, async (request) => {
     const userId = request.user.id
@@ -22,43 +84,16 @@ export async function profileRoutes(app: FastifyInstance) {
   app.get('/profile/stats', { preHandler: [authenticate] }, async (request) => {
     const userId = request.user.id
 
-    const [
-      workouts,
-      setCount,
-      minutesAgg,
-      typeCounts,
-      recentWorkouts,
-      setLogs,
-    ] = await Promise.all([
-      // All completed workouts (for streak + total count) — use startedAt for streak edge case
+    const [workouts, setCount, setLogs, recentWorkouts] = await Promise.all([
+      // All completed workouts (for streak + total count)
       prisma.workout.findMany({
         where: { userId, completedAt: { not: null } },
-        select: { completedAt: true, startedAt: true, durationMin: true, type: true },
+        select: { completedAt: true, startedAt: true },
         orderBy: { completedAt: 'desc' },
       }),
       // Total sets logged
       prisma.setLog.count({
         where: { exercise: { workout: { userId } } },
-      }),
-      // Sum of duration
-      prisma.workout.aggregate({
-        where: { userId, completedAt: { not: null } },
-        _sum: { durationMin: true },
-      }),
-      // Type frequencies for favorite
-      prisma.workout.groupBy({
-        by: ['type'],
-        where: { userId, completedAt: { not: null } },
-        _count: { type: true },
-        orderBy: { _count: { type: 'desc' } },
-        take: 1,
-      }),
-      // Last 5 completed workouts with exercise count
-      prisma.workout.findMany({
-        where: { userId, completedAt: { not: null } },
-        orderBy: { completedAt: 'desc' },
-        take: 5,
-        include: { _count: { select: { exercises: true } } },
       }),
       // All set logs for total weight lifted and personal records
       prisma.setLog.findMany({
@@ -69,6 +104,14 @@ export async function profileRoutes(app: FastifyInstance) {
           completedAt: true,
           exercise: { select: { name: true } },
         },
+        orderBy: { completedAt: 'desc' },
+      }),
+      // Last 5 completed workouts with exercise count
+      prisma.workout.findMany({
+        where: { userId, completedAt: { not: null } },
+        orderBy: { completedAt: 'desc' },
+        take: 5,
+        include: { _count: { select: { exercises: true } } },
       }),
     ])
 
@@ -111,43 +154,15 @@ export async function profileRoutes(app: FastifyInstance) {
       prevDay = day
     }
 
-    // This week workouts
-    const weekAgo = new Date(today.getTime() - 7 * DAY)
-    const thisWeekWorkouts = workouts.filter(
-      w => new Date(w.startedAt) >= weekAgo
-    ).length
-
-    // This month workouts
-    const now = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    const workoutsThisMonth = workouts.filter(
-      w => new Date(w.startedAt) >= monthStart
-    ).length
-
-    // Average workout duration
-    const durationsWithValue = workouts.filter(w => w.durationMin != null)
-    const avgWorkoutDuration = durationsWithValue.length > 0
-      ? Math.round(durationsWithValue.reduce((sum, w) => sum + (w.durationMin ?? 0), 0) / durationsWithValue.length)
-      : 0
-
     // Total weight lifted: sum of actualWeight * actualReps
     const totalWeightLifted = setLogs.reduce((sum, s) => {
       if (s.actualWeight && s.actualReps) return sum + s.actualWeight * s.actualReps
       return sum
     }, 0)
 
-    // Most frequent workout day of week (use startedAt)
-    const dayCounts: Record<string, number> = {}
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-    for (const w of workouts) {
-      const dayName = dayNames[new Date(w.startedAt).getDay()]
-      dayCounts[dayName] = (dayCounts[dayName] ?? 0) + 1
-    }
-    const mostFrequentDay = Object.keys(dayCounts).length > 0
-      ? Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0][0]
-      : null
-
-    // Personal records: heaviest weight per exercise, top 5
+    // Personal records: heaviest weight per exercise
+    // For each PR, also compute how many total workouts have been completed since that set was logged
+    const totalWorkouts = workouts.length
     const prMap: Record<string, { weightLbs: number; reps: number; date: string }> = {}
     for (const s of setLogs) {
       if (!s.actualWeight || !s.actualReps) continue
@@ -156,23 +171,23 @@ export async function profileRoutes(app: FastifyInstance) {
         prMap[name] = { weightLbs: s.actualWeight, reps: s.actualReps, date: s.completedAt.toISOString() }
       }
     }
+
+    // Sort PRs by date desc (most recent first), compute workoutsSinceSet
     const personalRecords = Object.entries(prMap)
-      .map(([exerciseName, data]) => ({ exerciseName, ...data }))
-      .sort((a, b) => b.weightLbs - a.weightLbs)
+      .map(([exerciseName, data]) => {
+        const prDate = new Date(data.date)
+        const workoutsSinceSet = workouts.filter(w => w.completedAt && new Date(w.completedAt) > prDate).length
+        return { exerciseName, ...data, workoutsSinceSet }
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 5)
 
     return {
-      totalWorkouts: workouts.length,
+      totalWorkouts,
       totalSets: setCount,
-      totalMinutes: minutesAgg._sum.durationMin ?? 0,
       currentStreak: streak,
       longestStreak,
-      favoriteType: typeCounts[0]?.type ?? null,
-      thisWeekWorkouts,
-      workoutsThisMonth,
-      avgWorkoutDuration,
       totalWeightLifted: Math.round(totalWeightLifted),
-      mostFrequentDay,
       personalRecords,
       recentWorkouts: recentWorkouts.map(w => ({
         id: w.id,

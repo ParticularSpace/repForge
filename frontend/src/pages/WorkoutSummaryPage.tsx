@@ -24,24 +24,24 @@ export default function WorkoutSummaryPage() {
     checkedRef.current = true
 
     const storedIds = loadStoredAchievementIds()
-    const earnedIds = achievementsData.achievements
-      .filter(a => a.earnedAt !== null)
-      .map(a => a.id)
+    // Flatten all tiers across all chains to find earned IDs
+    const earnedIds = achievementsData.chains
+      .flatMap(c => c.tiers)
+      .filter(t => t.earned)
+      .map(t => t.id)
 
     // Only show celebration if user has prior stored achievements (not first-ever load)
     if (storedIds.length === 0) {
-      // First time: just store what's earned, don't celebrate
       localStorage.setItem(STORED_ACHIEVEMENTS_KEY, JSON.stringify(earnedIds))
       return
     }
 
-    const newlyEarned = earnedIds.filter(id => !storedIds.includes(id))
+    const newlyEarned = earnedIds.filter((tid: string) => !storedIds.includes(tid))
     if (newlyEarned.length > 0) {
       setNewAchievements(newlyEarned)
       setBannerVisible(true)
     }
 
-    // Update stored list
     localStorage.setItem(STORED_ACHIEVEMENTS_KEY, JSON.stringify(earnedIds))
   }, [achievementsData])
 
@@ -72,7 +72,8 @@ export default function WorkoutSummaryPage() {
   const totalSets = exercises.reduce((sum, ex) => sum + (ex.setLogs?.length ?? 0), 0)
 
   const currentBannerAchievementId = newAchievements[bannerIndex]
-  const currentBannerAchievement = achievementsData?.achievements.find(a => a.id === currentBannerAchievementId)
+  const allTiers = achievementsData?.chains.flatMap(c => c.tiers) ?? []
+  const currentBannerAchievement = allTiers.find(t => t.id === currentBannerAchievementId)
 
   return (
     <div className="min-h-dvh bg-gray-50 flex flex-col">

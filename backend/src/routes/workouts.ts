@@ -165,23 +165,37 @@ General fitness: balanced mix of push, pull, and leg movements regardless of wor
 export async function workoutRoutes(app: FastifyInstance) {
   // POST /workouts/generate — returns plan without saving
   app.post('/workouts/generate', { preHandler: [authenticate] }, async (request, reply) => {
-    const { type, difficulty, personalInfo } = request.body as {
+    const { type, difficulty, personalInfo: overrides } = request.body as {
       type: string
       difficulty: string
-      personalInfo?: PersonalInfo
+      personalInfo?: Partial<PersonalInfo>
     }
 
-    // Fetch user's equipment preferences; empty array = full gym (no restriction)
+    // Fetch full user profile; merge with any overrides from request body
     const userRecord = await prisma.user.findUnique({
       where: { id: request.user.id },
-      select: { equipmentPreferences: true },
+      select: {
+        age: true,
+        weightLbs: true,
+        fitnessGoal: true,
+        experienceNotes: true,
+        equipmentPreferences: true,
+      },
     })
+
+    const profileInfo: PersonalInfo = {
+      age: overrides?.age ?? userRecord?.age ?? undefined,
+      weightLbs: overrides?.weightLbs ?? userRecord?.weightLbs ?? undefined,
+      goal: overrides?.goal ?? userRecord?.fitnessGoal ?? undefined,
+      notes: overrides?.notes ?? userRecord?.experienceNotes ?? undefined,
+    }
+
     const equipmentPreferences = (userRecord?.equipmentPreferences as string[] | null) ?? []
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 4096,
-      messages: [{ role: 'user', content: GENERATE_PROMPT(type, difficulty, personalInfo, equipmentPreferences.length > 0 ? equipmentPreferences : undefined) }],
+      messages: [{ role: 'user', content: GENERATE_PROMPT(type, difficulty, profileInfo, equipmentPreferences.length > 0 ? equipmentPreferences : undefined) }],
     })
 
     const content = response.content[0]
