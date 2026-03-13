@@ -1,4 +1,12 @@
 export interface ApiResponse<T> { data: T; message?: string }
+
+export interface PersonalInfo {
+  age?: number
+  weightLbs?: number
+  goal?: string
+  equipment?: string
+  notes?: string
+}
 export interface PaginatedResponse<T> extends ApiResponse<T[]> { total: number; page: number; pageSize: number }
 
 export type WorkoutType = 'push' | 'pull' | 'legs' | 'full_body' | 'cardio'
@@ -37,6 +45,23 @@ export interface Exercise {
   weightLbs?: number
   notes?: string
   setLogs?: SetLog[]
+}
+
+export interface ProfileStats {
+  totalWorkouts: number
+  totalSets: number
+  totalMinutes: number
+  currentStreak: number
+  favoriteType: string | null
+  thisWeekWorkouts: number
+  recentWorkouts: Array<{
+    id: string
+    name: string
+    type: string
+    completedAt: string
+    durationMin: number | null
+    exerciseCount: number
+  }>
 }
 
 export interface Workout {

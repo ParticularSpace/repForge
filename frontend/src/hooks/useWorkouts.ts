@@ -1,6 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import type { Workout, WorkoutPlan, WorkoutType, Difficulty } from '@/types'
+import type { Workout, WorkoutPlan, WorkoutType, Difficulty, PersonalInfo, ProfileStats } from '@/types'
+
+export function useProfileStats() {
+  return useQuery({
+    queryKey: ['profile-stats'],
+    queryFn: () => api.get<ProfileStats>('/api/v1/profile/stats'),
+  })
+}
 
 export function useWorkouts() {
   return useQuery({
@@ -19,8 +26,8 @@ export function useWorkout(id: string | undefined) {
 
 export function useGenerateWorkout() {
   return useMutation({
-    mutationFn: ({ type, difficulty }: { type: WorkoutType; difficulty: Difficulty }) =>
-      api.post<WorkoutPlan>('/api/v1/workouts/generate', { type, difficulty }),
+    mutationFn: ({ type, difficulty, personalInfo }: { type: WorkoutType; difficulty: Difficulty; personalInfo?: PersonalInfo }) =>
+      api.post<WorkoutPlan>('/api/v1/workouts/generate', { type, difficulty, personalInfo }),
   })
 }
 

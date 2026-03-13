@@ -2,7 +2,9 @@ import { Outlet, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import Layout from '@/components/layout/Layout'
 import LoginPage from '@/pages/LoginPage'
+import ResetPasswordPage from '@/pages/ResetPasswordPage'
 import HomePage from '@/pages/HomePage'
+import ProfilePage from '@/pages/ProfilePage'
 import WorkoutPreviewPage from '@/pages/WorkoutPreviewPage'
 import ActiveWorkoutPage from '@/pages/ActiveWorkoutPage'
 import WorkoutSummaryPage from '@/pages/WorkoutSummaryPage'
@@ -27,10 +29,12 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={!user ? <LoginPage /> : <Navigate to="/" />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-      {/* Routes with the main Layout (header + nav) */}
+      {/* Routes with the main Layout (header + bottom nav) */}
       <Route element={user ? <Layout /> : <Navigate to="/login" />}>
         <Route path="/" element={<HomePage />} />
+        <Route path="/profile" element={<ProfilePage />} />
       </Route>
 
       {/* Full-screen workout routes (no Layout header) */}

@@ -5,11 +5,28 @@ import { prisma } from '../lib/prisma'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-const GENERATE_PROMPT = (type: string, difficulty: string) => `You are a certified personal trainer. Generate a structured workout plan.
+interface PersonalInfo {
+  age?: number
+  weightLbs?: number
+  goal?: string
+  equipment?: string
+  notes?: string
+}
+
+const GENERATE_PROMPT = (type: string, difficulty: string, info?: PersonalInfo) => {
+  const personalLines = info ? [
+    info.age       ? `Athlete age: ${info.age} years`          : '',
+    info.weightLbs ? `Athlete weight: ${info.weightLbs} lbs`   : '',
+    info.goal      ? `Primary goal: ${info.goal}`              : '',
+    info.equipment ? `Available equipment: ${info.equipment}`  : '',
+    info.notes     ? `Additional context: ${info.notes}`       : '',
+  ].filter(Boolean).join('\n') : ''
+
+  return `You are a certified personal trainer. Generate a structured workout plan.
 
 Workout type: ${type}
 Difficulty: ${difficulty}
-
+${personalLines ? personalLines + '\n' : ''}
 Return ONLY valid JSON in this exact shape, no other text:
 {
   "name": "Push day",
@@ -27,20 +44,27 @@ Return ONLY valid JSON in this exact shape, no other text:
 
 Rules:
 - 4–6 exercises for beginner, 5–7 for intermediate, 6–8 for advanced
-- Include realistic starting weights for a beginner/intermediate/advanced lifter
+- Adjust weights and reps to match the athlete's age, weight and goal if provided
+- If equipment is limited, only use exercises appropriate for that equipment
+- If notes mention an injury or limitation, avoid exercises that could aggravate it
 - First exercise should always be a compound movement
-- Last exercise can be an isolation or core movement
-- notes field is optional coaching tip, keep it under 10 words`
+- notes field per exercise is an optional coaching tip, keep it under 10 words
+- Return only the JSON, no preamble or explanation`
+}
 
 export async function workoutRoutes(app: FastifyInstance) {
   // POST /workouts/generate — returns plan without saving
   app.post('/workouts/generate', { preHandler: [authenticate] }, async (request, reply) => {
-    const { type, difficulty } = request.body as { type: string; difficulty: string }
+    const { type, difficulty, personalInfo } = request.body as {
+      type: string
+      difficulty: string
+      personalInfo?: PersonalInfo
+    }
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 1024,
-      messages: [{ role: 'user', content: GENERATE_PROMPT(type, difficulty) }],
+      messages: [{ role: 'user', content: GENERATE_PROMPT(type, difficulty, personalInfo) }],
     })
 
     const content = response.content[0]

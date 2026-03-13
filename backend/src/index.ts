@@ -4,6 +4,7 @@ import cors from '@fastify/cors'
 import { healthRoutes } from './routes/health'
 import { userRoutes } from './routes/users'
 import { workoutRoutes } from './routes/workouts'
+import { profileRoutes } from './routes/profile'
 
 const app = Fastify({ logger: true })
 
@@ -15,6 +16,7 @@ async function main() {
   app.register(healthRoutes, { prefix: '/api' })
   app.register(userRoutes, { prefix: '/api/v1' })
   app.register(workoutRoutes, { prefix: '/api/v1' })
+  app.register(profileRoutes, { prefix: '/api/v1' })
 
   const port = Number(process.env.PORT ?? 3000)
   await app.listen({ port, host: '0.0.0.0' })
