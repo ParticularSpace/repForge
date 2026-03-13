@@ -61,7 +61,11 @@ export async function profileRoutes(app: FastifyInstance) {
     if ('preferredRestSeconds' in body) data.preferredRestSeconds = body.preferredRestSeconds
     if ('equipment' in body)            data.equipmentPreferences = body.equipment
 
-    await prisma.user.update({ where: { id: userId }, data })
+    await prisma.user.upsert({
+      where: { id: userId },
+      create: { id: userId, email: request.user.email ?? '', ...data },
+      update: data,
+    })
     return { success: true }
   })
 
@@ -77,7 +81,11 @@ export async function profileRoutes(app: FastifyInstance) {
   app.patch('/profile/equipment', { preHandler: [authenticate] }, async (request) => {
     const userId = request.user.id
     const { equipment } = request.body as { equipment: string[] }
-    await prisma.user.update({ where: { id: userId }, data: { equipmentPreferences: equipment } })
+    await prisma.user.upsert({
+      where: { id: userId },
+      create: { id: userId, email: request.user.email ?? '', equipmentPreferences: equipment },
+      update: { equipmentPreferences: equipment },
+    })
     return { success: true }
   })
 
