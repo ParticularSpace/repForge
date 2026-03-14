@@ -115,7 +115,10 @@ export async function stripeWebhookRoutes(fastify: FastifyInstance) {
 
 export async function subscriptionRoutes(fastify: FastifyInstance) {
   // POST /subscriptions/checkout — create Stripe Checkout session
-  fastify.post('/subscriptions/checkout', { preHandler: [authenticate] }, async (request, reply) => {
+  fastify.post('/subscriptions/checkout', {
+    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+    preHandler: [authenticate],
+  }, async (request, reply) => {
     const userId = (request as any).user.id
     const userRecord = await prisma.user.findUnique({
       where: { id: userId },

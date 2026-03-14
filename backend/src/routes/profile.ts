@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma'
 import { isPro } from '../lib/userPlan'
 import { isAdmin } from '../lib/admin'
 import { getWeekStart } from '../lib/dateUtils'
+import { profileUpdateSchema } from '../lib/validation'
 
 interface UserProfileUpdate {
   displayName?: string | null
@@ -77,8 +78,10 @@ export async function profileRoutes(app: FastifyInstance) {
   })
 
   // PATCH /profile — update user's profile fields
-  app.patch('/profile', { preHandler: [authenticate] }, async (request) => {
+  app.patch('/profile', { preHandler: [authenticate] }, async (request, reply) => {
     const userId = request.user.id
+    const parsed = profileUpdateSchema.safeParse(request.body)
+    if (!parsed.success) return reply.status(400).send({ error: parsed.error.issues[0].message })
     const body = request.body as UserProfileUpdate
 
     const data: Record<string, unknown> = {}

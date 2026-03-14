@@ -187,6 +187,7 @@ export default function AddExerciseSheet({
               onChange={e => setQuery(e.target.value)}
               autoFocus
               className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              style={{ fontSize: '16px' }}
             />
           </div>
 
@@ -245,6 +246,7 @@ export default function AddExerciseSheet({
                     value={customName}
                     onChange={e => setCustomName(e.target.value)}
                     className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    style={{ fontSize: '16px' }}
                   />
                   <div className="flex flex-wrap gap-2">
                     {MUSCLE_GROUP_OPTIONS.map(mg => (

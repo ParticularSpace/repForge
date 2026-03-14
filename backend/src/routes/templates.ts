@@ -221,8 +221,9 @@ export async function templateRoutes(fastify: FastifyInstance) {
     if (!body.name?.trim()) return reply.code(400).send({ error: 'name is required' })
     if (!body.exercises || body.exercises.length === 0) return reply.code(400).send({ error: 'exercises must be non-empty' })
 
-    const template = await prisma.workoutTemplate.findFirst({ where: { id, userId } })
+    const template = await prisma.workoutTemplate.findUnique({ where: { id } })
     if (!template) return reply.code(404).send({ error: 'Template not found' })
+    if (template.userId !== userId) return reply.code(403).send({ error: 'Forbidden' })
 
     const updated = await prisma.$transaction(async (tx) => {
       await tx.templateExercise.deleteMany({ where: { templateId: id } })
@@ -269,8 +270,9 @@ export async function templateRoutes(fastify: FastifyInstance) {
     }
 
     // Verify ownership
-    const template = await prisma.workoutTemplate.findFirst({ where: { id, userId } })
+    const template = await prisma.workoutTemplate.findUnique({ where: { id } })
     if (!template) return reply.code(404).send({ error: 'Template not found' })
+    if (template.userId !== userId) return reply.code(403).send({ error: 'Forbidden' })
 
     // Reject attempts to change name, order, or muscleGroups
     for (const e of body.exercises) {
@@ -312,8 +314,9 @@ export async function templateRoutes(fastify: FastifyInstance) {
     const userId = (request as any).user.id
     const { id } = request.params as { id: string }
 
-    const template = await prisma.workoutTemplate.findFirst({ where: { id, userId } })
+    const template = await prisma.workoutTemplate.findUnique({ where: { id } })
     if (!template) return reply.code(404).send({ error: 'Template not found' })
+    if (template.userId !== userId) return reply.code(403).send({ error: 'Forbidden' })
 
     await prisma.workoutTemplate.delete({ where: { id } })
     return reply.code(204).send()
@@ -324,11 +327,12 @@ export async function templateRoutes(fastify: FastifyInstance) {
     const userId = (request as any).user.id
     const { id } = request.params as { id: string }
 
-    const template = await prisma.workoutTemplate.findFirst({
-      where: { id, userId },
+    const template = await prisma.workoutTemplate.findUnique({
+      where: { id },
       include: { exercises: { orderBy: { order: 'asc' } } },
     })
     if (!template) return reply.code(404).send({ error: 'Template not found' })
+    if (template.userId !== userId) return reply.code(403).send({ error: 'Forbidden' })
 
     const workout = await prisma.workout.create({
       data: {

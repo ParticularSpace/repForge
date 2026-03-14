@@ -4,6 +4,8 @@ import { authenticate } from '../middleware/auth'
 import { prisma } from '../lib/prisma'
 import { isPro } from '../lib/userPlan'
 import { getWeekStart } from '../lib/dateUtils'
+import { generateSchema, nameSchema, exerciseInputSchema } from '../lib/validation'
+import { sanitizeForPrompt } from '../lib/sanitize'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -169,13 +171,13 @@ General fitness: balanced mix of push, pull, and leg movements regardless of wor
 
 export async function workoutRoutes(app: FastifyInstance) {
   // POST /workouts/generate — returns plan without saving
-  app.post('/workouts/generate', { preHandler: [authenticate] }, async (request, reply) => {
-    const { type, difficulty, personalInfo: overrides, muscleFocus } = request.body as {
-      type: string
-      difficulty: string
-      personalInfo?: Partial<PersonalInfo>
-      muscleFocus?: string[]
-    }
+  app.post('/workouts/generate', {
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    const parsed = generateSchema.safeParse(request.body)
+    if (!parsed.success) return reply.status(400).send({ error: parsed.error.issues[0].message })
+    const { type, difficulty, personalInfo: overrides, muscleFocus } = parsed.data
 
     // Fetch full user profile; merge with any overrides from request body
     const userRecord = await prisma.user.findUnique({
@@ -225,7 +227,7 @@ export async function workoutRoutes(app: FastifyInstance) {
       age: overrides?.age ?? userRecord?.age ?? undefined,
       weightLbs: overrides?.weightLbs ?? userRecord?.weightLbs ?? undefined,
       goal: overrides?.goal ?? userRecord?.fitnessGoal ?? undefined,
-      notes: overrides?.notes ?? userRecord?.experienceNotes ?? undefined,
+      notes: sanitizeForPrompt(overrides?.notes ?? userRecord?.experienceNotes),
     }
 
     const equipmentPreferences = (userRecord?.equipmentPreferences as string[] | null) ?? []
@@ -253,7 +255,27 @@ export async function workoutRoutes(app: FastifyInstance) {
   // POST /workouts — save workout + exercises to DB
   app.post('/workouts', { preHandler: [authenticate] }, async (request, reply) => {
     const user = request.user
-    const { name, type, difficulty, exercises, source } = request.body as {
+    const body = request.body as {
+      name: string
+      type: string
+      difficulty: string
+      source?: 'ai' | 'manual'
+      exercises: Array<{
+        name: string
+        order: number
+        sets: number
+        reps: number
+        weightLbs?: number
+        notes?: string
+        description?: string
+        muscleGroups?: string[]
+        modification?: string | null
+        coachingCue?: string | null
+      }>
+    }
+    const nameResult = nameSchema.safeParse(body.name)
+    if (!nameResult.success) return reply.status(400).send({ error: 'Workout name must be 1–100 characters' })
+    const { name, type, difficulty, exercises, source } = body as {
       name: string
       type: string
       difficulty: string
@@ -366,8 +388,8 @@ export async function workoutRoutes(app: FastifyInstance) {
     const user = request.user
     const { id } = request.params as { id: string }
 
-    const workout = await prisma.workout.findFirst({
-      where: { id, userId: user.id },
+    const workout = await prisma.workout.findUnique({
+      where: { id },
       include: {
         exercises: {
           orderBy: { order: 'asc' },
@@ -377,6 +399,7 @@ export async function workoutRoutes(app: FastifyInstance) {
     })
 
     if (!workout) return reply.status(404).send({ message: 'Not found' })
+    if (workout.userId !== user.id) return reply.status(403).send({ message: 'Forbidden' })
     return workout
   })
 
@@ -386,15 +409,18 @@ export async function workoutRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string }
     const { completedAt, durationMin } = request.body as { completedAt?: string; durationMin?: number }
 
-    const count = await prisma.workout.updateMany({
-      where: { id, userId: user.id },
+    const existing = await prisma.workout.findUnique({ where: { id }, select: { userId: true } })
+    if (!existing) return reply.status(404).send({ message: 'Not found' })
+    if (existing.userId !== user.id) return reply.status(403).send({ message: 'Forbidden' })
+
+    await prisma.workout.update({
+      where: { id },
       data: {
         ...(completedAt ? { completedAt: new Date(completedAt) } : {}),
         ...(durationMin !== undefined ? { durationMin } : {}),
       },
     })
 
-    if (count.count === 0) return reply.status(404).send({ message: 'Not found' })
     return { success: true }
   })
 
@@ -410,6 +436,9 @@ export async function workoutRoutes(app: FastifyInstance) {
       muscleGroups?: string[]
       insertAfterOrder?: number
     }
+
+    const exValidation = exerciseInputSchema.safeParse(body)
+    if (!exValidation.success) return reply.status(400).send({ error: exValidation.error.issues[0].message })
 
     const workout = await prisma.workout.findUnique({ where: { id: workoutId } })
     if (!workout) return reply.status(404).send({ error: 'Workout not found' })
@@ -462,12 +491,21 @@ export async function workoutRoutes(app: FastifyInstance) {
 
   // POST /exercises/:exerciseId/sets — log a completed set
   app.post('/exercises/:exerciseId/sets', { preHandler: [authenticate] }, async (request, reply) => {
+    const user = request.user
     const { exerciseId } = request.params as { exerciseId: string }
     const { setNumber, actualReps, actualWeight } = request.body as {
       setNumber: number
       actualReps?: number
       actualWeight?: number
     }
+
+    // Verify exercise belongs to a workout owned by the requesting user
+    const exercise = await prisma.exercise.findUnique({
+      where: { id: exerciseId },
+      select: { workout: { select: { userId: true } } },
+    })
+    if (!exercise) return reply.status(404).send({ message: 'Exercise not found' })
+    if (exercise.workout.userId !== user.id) return reply.status(403).send({ message: 'Forbidden' })
 
     const setLog = await prisma.setLog.create({
       data: {

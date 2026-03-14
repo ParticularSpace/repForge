@@ -9,7 +9,10 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string)
 
 export async function adminRoutes(fastify: FastifyInstance) {
   // GET /users — paginated user list with workout stats
-  fastify.get('/users', { preHandler: [authenticate, adminOnly] }, async (request) => {
+  fastify.get('/users', {
+    config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+    preHandler: [authenticate, adminOnly],
+  }, async (request) => {
     const { page = '1', limit = '20', search = '' } = request.query as {
       page?: string; limit?: string; search?: string
     }
@@ -28,7 +31,6 @@ export async function adminRoutes(fastify: FastifyInstance) {
           displayName: true,
           subscriptionStatus: true,
           proGrantedByAdmin: true,
-          stripeCustomerId: true,
           createdAt: true,
         },
         orderBy: { createdAt: 'desc' },
@@ -63,7 +65,6 @@ export async function adminRoutes(fastify: FastifyInstance) {
         subscriptionStatus: u.subscriptionStatus,
         isPro: isPro(u),
         proGrantedByAdmin: u.proGrantedByAdmin,
-        stripeCustomerId: u.stripeCustomerId,
         createdAt: u.createdAt.toISOString(),
         lastWorkoutAt: lastMap[u.id] ?? null,
         totalWorkouts: countMap[u.id] ?? 0,
@@ -87,7 +88,7 @@ export async function adminRoutes(fastify: FastifyInstance) {
         data: { proGrantedByAdmin: true, subscriptionStatus: 'pro' },
         select: {
           id: true, email: true, displayName: true,
-          subscriptionStatus: true, proGrantedByAdmin: true, stripeCustomerId: true, createdAt: true,
+          subscriptionStatus: true, proGrantedByAdmin: true, createdAt: true,
         },
       })
       return { ...updated, isPro: true, createdAt: updated.createdAt.toISOString() }
@@ -112,7 +113,7 @@ export async function adminRoutes(fastify: FastifyInstance) {
       data: { proGrantedByAdmin: false, subscriptionStatus: newStatus },
       select: {
         id: true, email: true, displayName: true,
-        subscriptionStatus: true, proGrantedByAdmin: true, stripeCustomerId: true, createdAt: true,
+        subscriptionStatus: true, proGrantedByAdmin: true, createdAt: true,
       },
     })
     return {

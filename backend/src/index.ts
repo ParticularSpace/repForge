@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
+import rateLimit from '@fastify/rate-limit'
 import { healthRoutes } from './routes/health'
 import { userRoutes } from './routes/users'
 import { workoutRoutes } from './routes/workouts'
@@ -14,17 +15,31 @@ import { adminRoutes } from './routes/admin'
 const app = Fastify({ logger: true })
 
 async function main() {
-  const allowedOrigins = (process.env.FRONTEND_URL ?? 'http://localhost:5173')
+  const envOrigins = (process.env.FRONTEND_URL ?? '')
     .split(',')
     .map(o => o.trim())
     .filter(Boolean)
+  // Always allow localhost in development; production origins come from FRONTEND_URL
+  const allowedOrigins = [...new Set([...envOrigins, 'http://localhost:5173'])]
 
   await app.register(cors, {
     origin: (origin, cb) => {
       if (!origin || allowedOrigins.includes(origin)) return cb(null, true)
       cb(new Error('Not allowed by CORS'), false)
     },
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  })
+
+  // Global rate limiting — Stripe webhook is excluded via allowList
+  await app.register(rateLimit, {
+    max: 100,
+    timeWindow: '1 minute',
+    allowList: (req) => req.url.startsWith('/api/webhooks/'),
+    errorResponseBuilder: () => ({
+      statusCode: 429,
+      message: 'Too many requests. Please slow down.',
+    }),
   })
 
   // Override JSON content-type parser to preserve raw body for Stripe webhook verification.
