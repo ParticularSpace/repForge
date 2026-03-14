@@ -101,6 +101,14 @@ model WorkoutTemplate {
   @@map("workout_templates")
 }
 
+model WeightLog {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  weightLbs Float    @map("weight_lbs")
+  loggedAt  DateTime @default(now()) @map("logged_at")
+  @@map("weight_logs")
+}
+
 model TemplateExercise {
   id           String          @id @default(uuid())
   templateId   String          @map("template_id")

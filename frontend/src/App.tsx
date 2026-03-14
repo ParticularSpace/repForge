@@ -63,6 +63,7 @@ export default function App() {
       <Route element={user ? <Layout /> : <Navigate to="/login" />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/workouts" element={<WorkoutsPage />} />
+        <Route path="/stats" element={<StatsPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/upgrade" element={<UpgradePage />} />
       </Route>
@@ -77,7 +78,6 @@ export default function App() {
         <Route path="/upgrade/success" element={<UpgradeSuccessPage />} />
         <Route path="/upgrade/cancelled" element={<UpgradeCancelPage />} />
         <Route path="/admin" element={<AdminPage />} />
-        <Route path="/stats" element={<StatsPage />} />
       </Route>
     </Routes>
     </>

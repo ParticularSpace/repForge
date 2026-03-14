@@ -25,6 +25,18 @@ function WorkoutsIcon({ active }: { active: boolean }) {
   )
 }
 
+function StatsIcon({ active }: { active: boolean }) {
+  const c = active ? '#1D9E75' : '#9ca3af'
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke={c}
+      strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="10" width="4" height="8" rx="1"/>
+      <rect x="8" y="6" width="4" height="12" rx="1"/>
+      <rect x="14" y="2" width="4" height="16" rx="1"/>
+    </svg>
+  )
+}
+
 function ProfileIcon({ active }: { active: boolean }) {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={active ? '#0d9488' : '#9ca3af'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -71,6 +83,12 @@ export default function Layout() {
           {({ isActive }) => (<>
             <WorkoutsIcon active={isActive} />
             <span className={`text-xs font-medium ${isActive ? 'text-teal-600' : 'text-gray-400'}`}>Workouts</span>
+          </>)}
+        </NavLink>
+        <NavLink to="/stats" className="flex-1 flex flex-col items-center justify-center py-3 gap-1">
+          {({ isActive }) => (<>
+            <StatsIcon active={isActive} />
+            <span className={`text-xs font-medium ${isActive ? 'text-teal-600' : 'text-gray-400'}`}>Stats</span>
           </>)}
         </NavLink>
         <NavLink to="/profile" className="flex-1 flex flex-col items-center justify-center py-3 gap-1">
