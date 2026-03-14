@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useCreateWorkout, useGenerateWorkout, useProfile } from '@/hooks/useWorkouts'
 import ExerciseInfoModal from '@/components/workout/ExerciseInfoModal'
 import EditExerciseModal from '@/components/workout/EditExerciseModal'
+import AddExerciseSheet from '@/components/workout/AddExerciseSheet'
 import { formatWeight } from '@/lib/formatWeight'
 import type { WorkoutPlan, WorkoutType, Difficulty, ExercisePlan } from '@/types'
 
@@ -28,6 +29,7 @@ export default function WorkoutPreviewPage() {
   const [infoExercise, setInfoExercise] = useState<ExercisePlan | null>(null)
   const [editExercise, setEditExercise] = useState<{ ex: ExercisePlan; index: number } | null>(null)
   const [expandedMods, setExpandedMods] = useState<Set<number>>(new Set())
+  const [showAddSheet, setShowAddSheet] = useState(false)
 
   const toggleMod = (i: number, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -67,6 +69,31 @@ export default function WorkoutPreviewPage() {
       exercises: prev.exercises.map((ex, i) => i === editExercise.index ? updated : ex),
     }))
     setEditExercise(null)
+  }
+
+  const handleAddExercise = (data: {
+    name: string; sets: number; reps: number; weightLbs: number
+    restSeconds: number; muscleGroups?: string[]; insertAfterOrder?: number
+  }) => {
+    const newEx: ExercisePlan = {
+      name: data.name, order: 0,
+      sets: data.sets, reps: data.reps, weightLbs: data.weightLbs,
+      restSeconds: data.restSeconds, muscleGroups: data.muscleGroups ?? [],
+    }
+    setPlan(prev => {
+      let exercises: ExercisePlan[]
+      if (data.insertAfterOrder !== undefined) {
+        const idx = prev.exercises.findIndex(e => e.order === data.insertAfterOrder)
+        exercises = [...prev.exercises]
+        exercises.splice(idx + 1, 0, newEx)
+      } else {
+        exercises = [...prev.exercises, newEx]
+      }
+      exercises = exercises.map((e, i) => ({ ...e, order: i + 1 }))
+      setSelected(new Set(exercises.map((_, i) => i)))
+      return { ...prev, exercises }
+    })
+    setShowAddSheet(false)
   }
 
   const handleStart = async () => {
@@ -197,6 +224,13 @@ export default function WorkoutPreviewPage() {
               )
             })}
           </div>
+
+          <button
+            onClick={() => setShowAddSheet(true)}
+            className="w-full flex items-center gap-2 py-3 px-4 text-teal-600 font-medium text-sm rounded-2xl border border-dashed border-teal-200 bg-white hover:bg-teal-50 transition-colors mt-1"
+          >
+            <span className="text-lg leading-none">+</span> Add exercise
+          </button>
         </div>
       </div>
 
@@ -240,6 +274,15 @@ export default function WorkoutPreviewPage() {
         onClose={() => setEditExercise(null)}
       />
     )}
+
+    <AddExerciseSheet
+      isOpen={showAddSheet}
+      onClose={() => setShowAddSheet(false)}
+      onAdd={handleAddExercise}
+      context="preview"
+      exerciseList={plan.exercises.map(e => ({ name: e.name, order: e.order }))}
+      defaultRestSeconds={profile?.preferredRestSeconds ?? 60}
+    />
     </>
   )
 }

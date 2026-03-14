@@ -25,6 +25,28 @@ export async function exerciseRoutes(fastify: FastifyInstance) {
     }))
   })
 
+  // GET /exercises/previous-weight — most recent logged weight for an exercise name
+  fastify.get('/exercises/previous-weight', { preHandler: authenticate }, async (request) => {
+    const userId = (request as any).user.id
+    const { name } = request.query as { name?: string }
+
+    if (!name?.trim()) return { weightLbs: null }
+
+    const setLog = await prisma.setLog.findFirst({
+      where: {
+        actualWeight: { not: null },
+        exercise: {
+          name: { equals: name.trim(), mode: 'insensitive' },
+          workout: { userId },
+        },
+      },
+      orderBy: { completedAt: 'desc' },
+      select: { actualWeight: true },
+    })
+
+    return { weightLbs: setLog?.actualWeight ?? null }
+  })
+
   // POST /exercises — auth required, creates a custom exercise
   fastify.post('/exercises', { preHandler: authenticate }, async (request, reply) => {
     const userId = (request as any).user.id

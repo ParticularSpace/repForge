@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import type { Workout, WorkoutPlan, WorkoutType, Difficulty, PersonalInfo, ProfileStats, AchievementsResponse, UserProfile } from '@/types'
+import type { Workout, Exercise, WorkoutPlan, WorkoutType, Difficulty, PersonalInfo, ProfileStats, AchievementsResponse, UserProfile } from '@/types'
 
 export function useProfile() {
   return useQuery({
@@ -79,6 +79,19 @@ export function useAchievements() {
     queryKey: ['achievements'],
     queryFn: () => api.get<AchievementsResponse>('/api/v1/profile/achievements'),
     staleTime: 0,
+  })
+}
+
+export function useAddExerciseToWorkout(workoutId: string) {
+  return useMutation({
+    mutationFn: (data: {
+      name: string
+      sets: number
+      reps: number
+      weightLbs?: number
+      muscleGroups?: string[]
+      insertAfterOrder?: number
+    }) => api.post<Exercise>(`/api/v1/workouts/${workoutId}/exercises`, data),
   })
 }
 

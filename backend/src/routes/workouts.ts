@@ -398,6 +398,68 @@ export async function workoutRoutes(app: FastifyInstance) {
     return { success: true }
   })
 
+  // POST /workouts/:workoutId/exercises — add a new exercise to an active workout
+  app.post('/workouts/:workoutId/exercises', { preHandler: [authenticate] }, async (request, reply) => {
+    const user = request.user
+    const { workoutId } = request.params as { workoutId: string }
+    const body = request.body as {
+      name: string
+      sets: number
+      reps: number
+      weightLbs?: number
+      muscleGroups?: string[]
+      insertAfterOrder?: number
+    }
+
+    const workout = await prisma.workout.findUnique({ where: { id: workoutId } })
+    if (!workout) return reply.status(404).send({ error: 'Workout not found' })
+    if (workout.userId !== user.id) return reply.status(403).send({ error: 'Forbidden' })
+
+    let newExercise
+    if (body.insertAfterOrder !== undefined) {
+      newExercise = await prisma.$transaction(async (tx) => {
+        await tx.exercise.updateMany({
+          where: { workoutId, order: { gt: body.insertAfterOrder! } },
+          data: { order: { increment: 1 } },
+        })
+        return tx.exercise.create({
+          data: {
+            workoutId,
+            name: body.name,
+            order: body.insertAfterOrder! + 1,
+            sets: body.sets,
+            reps: body.reps,
+            weightLbs: body.weightLbs ?? null,
+            muscleGroups: body.muscleGroups ?? [],
+          },
+        })
+      })
+    } else {
+      const agg = await prisma.exercise.aggregate({
+        where: { workoutId },
+        _max: { order: true },
+      })
+      const nextOrder = (agg._max.order ?? 0) + 1
+      newExercise = await prisma.exercise.create({
+        data: {
+          workoutId,
+          name: body.name,
+          order: nextOrder,
+          sets: body.sets,
+          reps: body.reps,
+          weightLbs: body.weightLbs ?? null,
+          muscleGroups: body.muscleGroups ?? [],
+        },
+      })
+    }
+
+    return reply.status(201).send({
+      ...newExercise,
+      muscleGroups: newExercise.muscleGroups as string[],
+      setLogs: [],
+    })
+  })
+
   // POST /exercises/:exerciseId/sets — log a completed set
   app.post('/exercises/:exerciseId/sets', { preHandler: [authenticate] }, async (request, reply) => {
     const { exerciseId } = request.params as { exerciseId: string }
