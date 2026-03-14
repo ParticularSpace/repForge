@@ -48,7 +48,6 @@ export default function EquipmentPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     api.get<{ equipment: string[] }>('/api/v1/profile/equipment')
@@ -85,8 +84,7 @@ export default function EquipmentPage() {
     setSaving(true)
     try {
       await api.patch('/api/v1/profile/equipment', { equipment: Array.from(selected) })
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
+      navigate(-1)
     } finally {
       setSaving(false)
     }
@@ -191,9 +189,6 @@ export default function EquipmentPage() {
       {/* Fixed save button */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 pb-safe-bar px-4 pt-3">
         <div className="max-w-lg mx-auto">
-          {saved && (
-            <p className="text-xs text-teal-600 text-center mb-2 font-medium">Saved!</p>
-          )}
           <button
             onClick={handleSave}
             disabled={saving}
