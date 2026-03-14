@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { authenticate } from '../middleware/auth'
 import { prisma } from '../lib/prisma'
+import { isPro } from '../lib/userPlan'
 
 function mapTemplate(t: any) {
   return {
@@ -70,6 +71,34 @@ export async function templateRoutes(fastify: FastifyInstance) {
     }
 
     const source = body.source ?? 'manual'
+    const userEmail = (request as any).user.email ?? ''
+    const userRecord = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { subscriptionStatus: true, proGrantedByAdmin: true },
+    })
+    const userForPlan = {
+      subscriptionStatus: userRecord?.subscriptionStatus ?? 'free',
+      proGrantedByAdmin: userRecord?.proGrantedByAdmin ?? false,
+      email: userEmail,
+    }
+
+    // Gate: free users limited to 3 manual templates (only block new, not updates)
+    if (source === 'manual' && !isPro(userForPlan)) {
+      const existing = await prisma.workoutTemplate.findFirst({
+        where: { userId, name: body.name.trim(), source: 'manual' },
+        select: { id: true },
+      })
+      if (!existing) {
+        const count = await prisma.workoutTemplate.count({ where: { userId, source: 'manual' } })
+        if (count >= 3) {
+          return reply.code(403).send({
+            code: 'TEMPLATE_LIMIT_REACHED',
+            message: 'Free accounts can save up to 3 templates.',
+            upgradeRequired: true,
+          })
+        }
+      }
+    }
 
     // For AI templates, upsert by userId+name+source
     if (source === 'ai') {

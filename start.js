@@ -59,5 +59,5 @@ result.then(
 )
 
 process.on('SIGINT', () => {
-  console.log(`\n\n${teal}  RepTrack stopped. See you at the gym! 💪${reset}\n`)
+  console.log(`\n\n${teal}  RepFlow stopped. See you at the gym! 💪${reset}\n`)
 })

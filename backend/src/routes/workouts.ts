@@ -2,6 +2,8 @@ import { FastifyInstance } from 'fastify'
 import Anthropic from '@anthropic-ai/sdk'
 import { authenticate } from '../middleware/auth'
 import { prisma } from '../lib/prisma'
+import { isPro } from '../lib/userPlan'
+import { getWeekStart } from '../lib/dateUtils'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -184,8 +186,40 @@ export async function workoutRoutes(app: FastifyInstance) {
         fitnessGoal: true,
         experienceNotes: true,
         equipmentPreferences: true,
+        subscriptionStatus: true,
+        proGrantedByAdmin: true,
       },
     })
+
+    const userEmail = request.user.email ?? ''
+    const userForPlan = {
+      subscriptionStatus: userRecord?.subscriptionStatus ?? 'free',
+      proGrantedByAdmin: userRecord?.proGrantedByAdmin ?? false,
+      email: userEmail,
+    }
+
+    // Gate: muscle focus chips are Pro-only
+    if (muscleFocus && muscleFocus.length > 0 && !isPro(userForPlan)) {
+      return reply.status(403).send({
+        code: 'MUSCLE_FOCUS_PRO_ONLY',
+        message: 'Muscle focus is a Pro feature.',
+        upgradeRequired: true,
+      })
+    }
+
+    // Gate: free users limited to 3 AI generations per week (Mon–Sun)
+    if (!isPro(userForPlan)) {
+      const weeklyCount = await prisma.workout.count({
+        where: { userId: request.user.id, source: 'ai', startedAt: { gte: getWeekStart() } },
+      })
+      if (weeklyCount >= 3) {
+        return reply.status(403).send({
+          code: 'GENERATION_LIMIT_REACHED',
+          message: 'You have used all 3 AI generations this week.',
+          upgradeRequired: true,
+        })
+      }
+    }
 
     const profileInfo: PersonalInfo = {
       age: overrides?.age ?? userRecord?.age ?? undefined,
@@ -244,6 +278,7 @@ export async function workoutRoutes(app: FastifyInstance) {
         name,
         type,
         difficulty,
+        source: source ?? 'manual',
         exercises: {
           create: exercises.map(ex => ({
             name: ex.name,

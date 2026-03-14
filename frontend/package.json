@@ -1,5 +1,5 @@
 {
-  "name": "app-frontend",
+  "name": "repflow-frontend",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,6 +9,7 @@
     "lint": "eslint . --ext ts,tsx"
   },
   "dependencies": {
+    "@stripe/stripe-js": "^8.9.0",
     "@supabase/supabase-js": "^2.39.0",
     "@tanstack/react-query": "^5.17.0",
     "react": "^18.2.0",

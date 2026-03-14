@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { useGenerateWorkout, useCreateWorkout, useProfile } from '@/hooks/useWorkouts'
+import { useSubscription } from '@/hooks/useSubscription'
 import { useTemplates, useCreateTemplate, useUpdateTemplate, useStartTemplate } from '@/hooks/useTemplates'
 import { useExerciseSearch, useCreateExercise } from '@/hooks/useExerciseLibrary'
 import EditExerciseModal from '@/components/workout/EditExerciseModal'
@@ -41,7 +42,7 @@ function fmtDate(iso: string | null | undefined) {
 
 // ─── Generate Sub-tab ────────────────────────────────────────────────────────
 
-function GenerateTab() {
+function GenerateTab({ isPro }: { isPro: boolean }) {
   const navigate = useNavigate()
   const [type, setType] = useState<WorkoutType>('push')
   const [difficulty, setDifficulty] = useState<Difficulty>('beginner')
@@ -79,12 +80,26 @@ function GenerateTab() {
           ))}
         </div>
 
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Focus on <span className="font-normal normal-case text-gray-300">(optional)</span></p>
-        <div className="flex flex-wrap gap-2 mb-5">
-          {MUSCLE_FOCUSES.map(m => (
-            <Chip key={m} label={m} selected={muscleFocus.includes(m)} onClick={() => toggleFocus(m)} />
-          ))}
-        </div>
+        {isPro ? (
+          <>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+              Focus on <span className="font-normal normal-case text-gray-300">(optional)</span>
+            </p>
+            <div className="flex flex-wrap gap-2 mb-5">
+              {MUSCLE_FOCUSES.map(m => (
+                <Chip key={m} label={m} selected={muscleFocus.includes(m)} onClick={() => toggleFocus(m)} />
+              ))}
+            </div>
+          </>
+        ) : (
+          <Link to="/upgrade?reason=muscle_focus" className="flex items-center justify-between mb-5 bg-gray-50 rounded-xl px-3 py-2.5 group">
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Muscle focus</p>
+              <p className="text-xs text-gray-400 mt-0.5">Target specific muscles with AI</p>
+            </div>
+            <span className="text-xs font-semibold text-teal-600 group-hover:underline">⚡ Pro →</span>
+          </Link>
+        )}
 
         <button
           onClick={handleGenerate}
@@ -463,6 +478,7 @@ function BuildTab({ editingTemplate }: { editingTemplate?: WorkoutTemplate }) {
 function TemplatesTab() {
   const navigate = useNavigate()
   const { data, isLoading } = useTemplates()
+  const { isPro, limits } = useSubscription()
   const startTemplate = useStartTemplate()
   const [startingId, setStartingId] = useState<string | null>(null)
 
@@ -484,6 +500,7 @@ function TemplatesTab() {
   const manual = data?.manual ?? []
   const ai = data?.ai ?? []
   const isEmpty = manual.length === 0 && ai.length === 0
+  const templateLimit = limits.savedTemplates === -1 ? null : limits.savedTemplates
 
   if (isEmpty) {
     return (
@@ -499,7 +516,16 @@ function TemplatesTab() {
     <div className="flex flex-col gap-6">
       {manual.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">My routines</p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
+              My routines{!isPro && templateLimit !== null ? ` (${manual.length}/${templateLimit})` : ''}
+            </p>
+            {!isPro && templateLimit !== null && manual.length >= templateLimit && (
+              <Link to="/upgrade?reason=template_limit" className="text-xs font-semibold text-teal-600 hover:underline">
+                ⚡ Upgrade for unlimited
+              </Link>
+            )}
+          </div>
           <div className="flex flex-col gap-3">
             {manual.map(t => (
               <button
@@ -577,6 +603,7 @@ const TAB_STORAGE_KEY = 'workouts_tab'
 export default function WorkoutsPage() {
   const location = useLocation()
   const navState = location.state as WorkoutsState | null
+  const { isPro } = useSubscription()
 
   const [tab, setTab] = useState<Tab>(() => {
     if (navState?.activeTab) return navState.activeTab
@@ -610,7 +637,7 @@ export default function WorkoutsPage() {
         ))}
       </div>
 
-      {tab === 'generate' && <GenerateTab />}
+      {tab === 'generate' && <GenerateTab isPro={isPro} />}
       {tab === 'build' && <BuildTab editingTemplate={editingTemplate} />}
       {tab === 'templates' && <TemplatesTab />}
     </div>

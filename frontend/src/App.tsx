@@ -11,6 +11,10 @@ import ActiveWorkoutPage from '@/pages/ActiveWorkoutPage'
 import WorkoutSummaryPage from '@/pages/WorkoutSummaryPage'
 import WorkoutsPage from '@/pages/WorkoutsPage'
 import TemplateDetailPage from '@/pages/TemplateDetailPage'
+import UpgradePage from '@/pages/UpgradePage'
+import UpgradeSuccessPage from '@/pages/UpgradeSuccessPage'
+import UpgradeCancelPage from '@/pages/UpgradeCancelPage'
+import AdminPage from '@/pages/AdminPage'
 
 function AuthGuard() {
   const { user, loading } = useAuth()
@@ -39,6 +43,7 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/workouts" element={<WorkoutsPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/upgrade" element={<UpgradePage />} />
       </Route>
 
       {/* Full-screen workout routes (no Layout header) */}
@@ -48,6 +53,9 @@ export default function App() {
         <Route path="/workout/:id/summary" element={<WorkoutSummaryPage />} />
         <Route path="/profile/equipment" element={<EquipmentPage />} />
         <Route path="/workouts/templates/:templateId" element={<TemplateDetailPage />} />
+        <Route path="/upgrade/success" element={<UpgradeSuccessPage />} />
+        <Route path="/upgrade/cancelled" element={<UpgradeCancelPage />} />
+        <Route path="/admin" element={<AdminPage />} />
       </Route>
     </Routes>
   )

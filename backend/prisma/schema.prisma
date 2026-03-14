@@ -20,9 +20,14 @@ model User {
   fitnessGoal          String?  @map("fitness_goal")
   experienceNotes      String?  @map("experience_notes")
   preferredRestSeconds Int?     @map("preferred_rest_seconds") @default(60)
-  equipmentPreferences Json?    @map("equipment_preferences") @default("[]")
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt      @map("updated_at")
+  equipmentPreferences Json?     @map("equipment_preferences") @default("[]")
+  subscriptionStatus   String    @default("free") @map("subscription_status")
+  stripeCustomerId     String?   @unique @map("stripe_customer_id")
+  stripeSubscriptionId String?   @unique @map("stripe_subscription_id")
+  proGrantedByAdmin    Boolean   @default(false) @map("pro_granted_by_admin")
+  subscriptionEndsAt   DateTime? @map("subscription_ends_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt      @map("updated_at")
   @@map("users")
 }
 
@@ -35,6 +40,7 @@ model Workout {
   startedAt   DateTime   @default(now()) @map("started_at")
   completedAt DateTime?  @map("completed_at")
   durationMin Int?       @map("duration_min")
+  source      String     @default("manual")
   exercises   Exercise[]
   @@map("workouts")
 }

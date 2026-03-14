@@ -51,7 +51,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-dvh flex flex-col bg-gray-50 pt-safe pb-safe">
       <div className="pt-12 pb-8 text-center">
-        <h1 className="text-3xl font-bold text-teal-600 tracking-tight">RepTrack</h1>
+        <h1 className="text-3xl font-bold text-teal-600 tracking-tight">RepFlow</h1>
         <p className="text-sm text-gray-400 mt-1">AI-powered workout tracker</p>
       </div>
 

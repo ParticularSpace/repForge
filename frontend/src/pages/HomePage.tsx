@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useWorkouts, useGenerateWorkout, useProfile } from '@/hooks/useWorkouts'
+import { useSubscription } from '@/hooks/useSubscription'
 import { api } from '@/lib/api'
 import Chip from '@/components/ui/Chip'
 import type { WorkoutType, Difficulty, Workout } from '@/types'
@@ -35,6 +36,10 @@ export default function HomePage() {
   const { data: workouts } = useWorkouts()
   const { data: profile } = useProfile()
   const generate = useGenerateWorkout()
+  const { isPro, weeklyAiGenerations, limits } = useSubscription()
+
+  const aiLimit = limits.aiGenerationsPerWeek === -1 ? Infinity : limits.aiGenerationsPerWeek
+  const atAiLimit = !isPro && weeklyAiGenerations >= aiLimit
 
   const greeting = profile?.displayName
     ? `Hey ${profile.displayName}, ready to train?`
@@ -88,17 +93,32 @@ export default function HomePage() {
           ))}
         </div>
 
-        <button
-          onClick={handleGenerate}
-          disabled={generate.isPending}
-          className="bg-teal-600 text-white rounded-xl py-3.5 w-full font-semibold text-base disabled:opacity-60 flex items-center justify-center gap-2"
-        >
-          {generate.isPending ? (
-            <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Generating…</>
-          ) : (
-            `Generate ${typeLabel} workout`
-          )}
-        </button>
+        {atAiLimit ? (
+          <Link
+            to="/upgrade?reason=ai_limit"
+            className="block bg-gray-900 text-white rounded-xl py-3.5 w-full font-semibold text-base text-center"
+          >
+            Upgrade for unlimited AI workouts →
+          </Link>
+        ) : (
+          <button
+            onClick={handleGenerate}
+            disabled={generate.isPending}
+            className="bg-teal-600 text-white rounded-xl py-3.5 w-full font-semibold text-base disabled:opacity-60 flex items-center justify-center gap-2"
+          >
+            {generate.isPending ? (
+              <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Generating…</>
+            ) : (
+              `Generate ${typeLabel} workout`
+            )}
+          </button>
+        )}
+
+        {!isPro && (
+          <p className="mt-2 text-center text-xs text-gray-400">
+            {weeklyAiGenerations}/{aiLimit === Infinity ? '∞' : aiLimit} AI workouts this week
+          </p>
+        )}
 
         {generate.isError && (
           <p className="mt-3 text-xs text-red-500 text-center bg-red-50 rounded-lg py-2 px-3">

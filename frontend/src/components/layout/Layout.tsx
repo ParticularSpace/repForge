@@ -41,7 +41,7 @@ export default function Layout() {
       {/* Header — pt-safe pushes content below the notch/status bar */}
       <header className="bg-white border-b border-gray-100 pt-safe">
         <div className="px-5 py-4 flex items-center justify-between">
-          <Link to="/" className="font-bold text-teal-600 text-lg tracking-tight no-underline">RepTrack</Link>
+          <Link to="/" className="font-bold text-teal-600 text-lg tracking-tight no-underline">RepFlow</Link>
           <div className="flex items-center gap-4">
             <span className="text-xs text-gray-400 hidden sm:block">{user?.email}</span>
             <button

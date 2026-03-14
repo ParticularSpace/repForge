@@ -18,6 +18,30 @@ export interface UserProfile {
   experienceNotes: string | null
   preferredRestSeconds: number
   equipment: string[]
+  // Subscription
+  subscriptionStatus: 'free' | 'pro' | 'past_due' | 'cancelled'
+  isPro: boolean
+  grantedByAdmin: boolean
+  endsAt: string | null
+  isAdmin: boolean
+  weeklyAiGenerations: number
+  limits: {
+    aiGenerationsPerWeek: number // -1 = unlimited
+    savedTemplates: number
+  }
+}
+
+export interface AdminUser {
+  id: string
+  email: string
+  displayName: string | null
+  subscriptionStatus: string
+  isPro: boolean
+  proGrantedByAdmin: boolean
+  stripeCustomerId: string | null
+  createdAt: string
+  lastWorkoutAt: string | null
+  totalWorkouts: number
 }
 
 export interface PaginatedResponse<T> extends ApiResponse<T[]> { total: number; page: number; pageSize: number }

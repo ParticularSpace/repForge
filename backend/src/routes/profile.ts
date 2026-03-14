@@ -1,6 +1,9 @@
 import { FastifyInstance } from 'fastify'
 import { authenticate } from '../middleware/auth'
 import { prisma } from '../lib/prisma'
+import { isPro } from '../lib/userPlan'
+import { isAdmin } from '../lib/admin'
+import { getWeekStart } from '../lib/dateUtils'
 
 interface UserProfileUpdate {
   displayName?: string | null
@@ -18,20 +21,38 @@ export async function profileRoutes(app: FastifyInstance) {
   // GET /profile — return user's full profile
   app.get('/profile', { preHandler: [authenticate] }, async (request) => {
     const userId = request.user.id
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        displayName: true,
-        age: true,
-        weightLbs: true,
-        heightIn: true,
-        gender: true,
-        fitnessGoal: true,
-        experienceNotes: true,
-        preferredRestSeconds: true,
-        equipmentPreferences: true,
-      },
-    })
+    const userEmail = request.user.email ?? ''
+
+    const [user, weeklyAiGenerations] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          displayName: true,
+          age: true,
+          weightLbs: true,
+          heightIn: true,
+          gender: true,
+          fitnessGoal: true,
+          experienceNotes: true,
+          preferredRestSeconds: true,
+          equipmentPreferences: true,
+          subscriptionStatus: true,
+          proGrantedByAdmin: true,
+          subscriptionEndsAt: true,
+        },
+      }),
+      prisma.workout.count({
+        where: { userId, source: 'ai', startedAt: { gte: getWeekStart() } },
+      }),
+    ])
+
+    const userForPlan = {
+      subscriptionStatus: user?.subscriptionStatus ?? 'free',
+      proGrantedByAdmin: user?.proGrantedByAdmin ?? false,
+      email: userEmail,
+    }
+    const pro = isPro(userForPlan)
+
     return {
       displayName: user?.displayName ?? null,
       age: user?.age ?? null,
@@ -42,6 +63,16 @@ export async function profileRoutes(app: FastifyInstance) {
       experienceNotes: user?.experienceNotes ?? null,
       preferredRestSeconds: user?.preferredRestSeconds ?? 60,
       equipment: (user?.equipmentPreferences as string[] | null) ?? [],
+      subscriptionStatus: userForPlan.subscriptionStatus,
+      isPro: pro,
+      grantedByAdmin: userForPlan.proGrantedByAdmin,
+      endsAt: user?.subscriptionEndsAt?.toISOString() ?? null,
+      isAdmin: isAdmin(userEmail),
+      weeklyAiGenerations,
+      limits: {
+        aiGenerationsPerWeek: pro ? -1 : 3,
+        savedTemplates: pro ? -1 : 3,
+      },
     }
   })
 

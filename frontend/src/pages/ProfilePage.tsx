@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useProfileStats, useAchievements, useProfile, useUpdateProfile } from '@/hooks/useWorkouts'
+import { useSubscription, useCheckout, usePortal } from '@/hooks/useSubscription'
 import type { AchievementChain, UserProfile } from '@/types'
 
 const ACHIEVEMENTS_KEY = 'achievements_expanded'
@@ -138,6 +139,89 @@ function editToProfile(e: EditState): Partial<UserProfile> {
     experienceNotes: e.experienceNotes.trim() || null,
     preferredRestSeconds: e.preferredRestSeconds ? parseInt(e.preferredRestSeconds) : 60,
   }
+}
+
+function SubscriptionSection() {
+  const navigate = useNavigate()
+  const { isPro, status, grantedByAdmin, endsAt, weeklyAiGenerations, limits, isAdmin } = useSubscription()
+  const checkout = useCheckout()
+  const portal = usePortal()
+
+  const handleUpgrade = async () => {
+    const { checkoutUrl } = await checkout.mutateAsync()
+    window.location.href = checkoutUrl
+  }
+
+  const handlePortal = async () => {
+    const { portalUrl } = await portal.mutateAsync()
+    window.location.href = portalUrl
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-4">
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Subscription</p>
+
+      {isPro ? (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-100">
+              ⚡ Pro
+            </span>
+            {grantedByAdmin && (
+              <span className="text-xs text-gray-400">Complimentary</span>
+            )}
+          </div>
+          {status === 'past_due' && (
+            <p className="text-xs text-red-500 mb-3">Payment failed — please update your billing info.</p>
+          )}
+          {endsAt && !grantedByAdmin && (
+            <p className="text-xs text-gray-400 mb-3">
+              {status === 'cancelled' ? `Access until ${new Date(endsAt).toLocaleDateString()}` : `Renews ${new Date(endsAt).toLocaleDateString()}`}
+            </p>
+          )}
+          {!grantedByAdmin && (
+            <button
+              onClick={handlePortal}
+              disabled={portal.isPending}
+              className="text-sm text-teal-600 font-semibold hover:underline disabled:opacity-50"
+            >
+              {portal.isPending ? 'Loading…' : 'Manage billing →'}
+            </button>
+          )}
+        </div>
+      ) : (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-500">
+              Free plan
+            </span>
+            <button
+              onClick={() => navigate('/upgrade')}
+              className="text-xs font-semibold text-teal-600 hover:underline"
+            >
+              Upgrade to Pro →
+            </button>
+          </div>
+          <div className="space-y-1.5 text-xs text-gray-400">
+            <div className="flex items-center justify-between">
+              <span>AI workouts this week</span>
+              <span className={weeklyAiGenerations >= (limits.aiGenerationsPerWeek === -1 ? Infinity : limits.aiGenerationsPerWeek) ? 'text-red-400 font-medium' : 'text-gray-600 font-medium'}>
+                {weeklyAiGenerations} / {limits.aiGenerationsPerWeek === -1 ? '∞' : limits.aiGenerationsPerWeek}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isAdmin && (
+        <div className="mt-3 pt-3 border-t border-gray-50">
+          <Link to="/admin" className="text-xs font-semibold text-purple-600 hover:underline">
+            Admin panel →
+          </Link>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function ProfilePage() {
@@ -497,6 +581,9 @@ export default function ProfilePage() {
           </div>
         )}
       </div>
+
+      {/* Subscription */}
+      <SubscriptionSection />
 
       {/* Equipment row */}
       <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-5 flex items-center justify-between">
