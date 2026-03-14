@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react'
 import { Outlet, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { useProfile, useUpdateProfile } from '@/hooks/useWorkouts'
 import Layout from '@/components/layout/Layout'
 import LoginPage from '@/pages/LoginPage'
 import ResetPasswordPage from '@/pages/ResetPasswordPage'
@@ -15,6 +17,8 @@ import UpgradePage from '@/pages/UpgradePage'
 import UpgradeSuccessPage from '@/pages/UpgradeSuccessPage'
 import UpgradeCancelPage from '@/pages/UpgradeCancelPage'
 import AdminPage from '@/pages/AdminPage'
+import StatsPage from '@/pages/StatsPage'
+import OnboardingModal from '@/components/onboarding/OnboardingModal'
 
 function AuthGuard() {
   const { user, loading } = useAuth()
@@ -28,12 +32,29 @@ function AuthGuard() {
 
 export default function App() {
   const { user, loading } = useAuth()
+  const { data: profile } = useProfile()
+  const updateProfile = useUpdateProfile()
+  const [showOnboarding, setShowOnboarding] = useState(false)
+
+  useEffect(() => {
+    if (profile && profile.onboardingCompleted === false) {
+      setShowOnboarding(true)
+    }
+  }, [profile])
+
   if (loading) return (
     <div className="flex h-screen items-center justify-center">
       <div className="h-8 w-8 animate-spin rounded-full border-4 border-teal-600 border-t-transparent" />
     </div>
   )
   return (
+    <>
+    {showOnboarding && (
+      <OnboardingModal onComplete={() => {
+        setShowOnboarding(false)
+        updateProfile.mutate({ onboardingCompleted: true })
+      }} />
+    )}
     <Routes>
       <Route path="/login" element={!user ? <LoginPage /> : <Navigate to="/" />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -56,7 +77,9 @@ export default function App() {
         <Route path="/upgrade/success" element={<UpgradeSuccessPage />} />
         <Route path="/upgrade/cancelled" element={<UpgradeCancelPage />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/stats" element={<StatsPage />} />
       </Route>
     </Routes>
+    </>
   )
 }

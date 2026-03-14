@@ -23,6 +23,7 @@ export const profileUpdateSchema = z.object({
   fitnessGoal: z.string().trim().max(200).optional(),
   experienceNotes: z.string().trim().max(500).optional(),
   preferredRestSeconds: z.number().int().min(30).max(600).optional(),
+  onboardingCompleted: z.boolean().optional(),
 })
 
 export const generateSchema = z.object({

@@ -302,11 +302,16 @@ export default function ProfilePage() {
 
       {/* 4-card stat grid */}
       {stats && (
-        <div className="grid grid-cols-2 gap-3 mb-5">
-          <StatCard value={stats.totalWorkouts} label="Total workouts" />
-          <StatCard value={stats.longestStreak > 0 ? `${stats.longestStreak} days` : '—'} label="Best streak" />
-          <StatCard value={stats.totalSets} label="Total sets" />
-          <StatCard value={stats.currentStreak > 0 ? `${stats.currentStreak} days` : '—'} label="Current streak" />
+        <div className="mb-5">
+          <div className="grid grid-cols-2 gap-3 mb-2">
+            <StatCard value={stats.totalWorkouts} label="Total workouts" />
+            <StatCard value={stats.longestStreak > 0 ? `${stats.longestStreak} days` : '—'} label="Best streak" />
+            <StatCard value={stats.totalSets} label="Total sets" />
+            <StatCard value={stats.currentStreak > 0 ? `${stats.currentStreak} days` : '—'} label="Current streak" />
+          </div>
+          <Link to="/stats" className="text-sm font-semibold text-teal-600 hover:underline block text-right">
+            View full stats →
+          </Link>
         </div>
       )}
 

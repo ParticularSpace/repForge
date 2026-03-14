@@ -29,6 +29,7 @@ export interface UserProfile {
     aiGenerationsPerWeek: number // -1 = unlimited
     savedTemplates: number
   }
+  onboardingCompleted: boolean
 }
 
 export interface AdminUser {
@@ -38,7 +39,6 @@ export interface AdminUser {
   subscriptionStatus: string
   isPro: boolean
   proGrantedByAdmin: boolean
-  stripeCustomerId: string | null
   createdAt: string
   lastWorkoutAt: string | null
   totalWorkouts: number
@@ -99,6 +99,8 @@ export interface ProfileStats {
   currentStreak: number
   longestStreak: number
   totalWeightLifted: number
+  avgDurationMin: number | null
+  workoutsThisWeek: number
   personalRecords: Array<{
     exerciseName: string
     weightLbs: number

@@ -16,6 +16,7 @@ interface UserProfileUpdate {
   experienceNotes?: string | null
   preferredRestSeconds?: number | null
   equipment?: string[]
+  onboardingCompleted?: boolean
 }
 
 export async function profileRoutes(app: FastifyInstance) {
@@ -40,6 +41,7 @@ export async function profileRoutes(app: FastifyInstance) {
           subscriptionStatus: true,
           proGrantedByAdmin: true,
           subscriptionEndsAt: true,
+          onboardingCompleted: true,
         },
       }),
       prisma.workout.count({
@@ -74,6 +76,7 @@ export async function profileRoutes(app: FastifyInstance) {
         aiGenerationsPerWeek: pro ? -1 : 3,
         savedTemplates: pro ? -1 : 3,
       },
+      onboardingCompleted: user?.onboardingCompleted ?? false,
     }
   })
 
@@ -94,6 +97,7 @@ export async function profileRoutes(app: FastifyInstance) {
     if ('experienceNotes' in body)      data.experienceNotes = body.experienceNotes
     if ('preferredRestSeconds' in body) data.preferredRestSeconds = body.preferredRestSeconds
     if ('equipment' in body)            data.equipmentPreferences = body.equipment
+    if ('onboardingCompleted' in body)  data.onboardingCompleted = body.onboardingCompleted
 
     await prisma.user.upsert({
       where: { id: userId },
@@ -126,11 +130,11 @@ export async function profileRoutes(app: FastifyInstance) {
   app.get('/profile/stats', { preHandler: [authenticate] }, async (request) => {
     const userId = request.user.id
 
-    const [workouts, setCount, setLogs, recentWorkouts] = await Promise.all([
-      // All completed workouts (for streak + total count)
+    const [workouts, setCount, setLogs, recentWorkouts, workoutsThisWeek] = await Promise.all([
+      // All completed workouts (for streak + total count + avg duration)
       prisma.workout.findMany({
         where: { userId, completedAt: { not: null } },
-        select: { completedAt: true, startedAt: true },
+        select: { completedAt: true, startedAt: true, durationMin: true },
         orderBy: { completedAt: 'desc' },
       }),
       // Total sets logged
@@ -154,6 +158,10 @@ export async function profileRoutes(app: FastifyInstance) {
         orderBy: { completedAt: 'desc' },
         take: 5,
         include: { _count: { select: { exercises: true } } },
+      }),
+      // Workouts started this week (any status)
+      prisma.workout.count({
+        where: { userId, startedAt: { gte: getWeekStart() } },
       }),
     ])
 
@@ -196,6 +204,12 @@ export async function profileRoutes(app: FastifyInstance) {
       prevDay = day
     }
 
+    // Average workout duration
+    const workoutsWithDuration = workouts.filter(w => w.durationMin != null)
+    const avgDurationMin = workoutsWithDuration.length > 0
+      ? Math.round(workoutsWithDuration.reduce((sum, w) => sum + (w.durationMin ?? 0), 0) / workoutsWithDuration.length)
+      : null
+
     // Total weight lifted: sum of actualWeight * actualReps
     const totalWeightLifted = setLogs.reduce((sum, s) => {
       if (s.actualWeight && s.actualReps) return sum + s.actualWeight * s.actualReps
@@ -230,6 +244,8 @@ export async function profileRoutes(app: FastifyInstance) {
       currentStreak: streak,
       longestStreak,
       totalWeightLifted: Math.round(totalWeightLifted),
+      avgDurationMin,
+      workoutsThisWeek,
       personalRecords,
       recentWorkouts: recentWorkouts.map(w => ({
         id: w.id,

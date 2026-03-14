@@ -11,6 +11,7 @@ import { exerciseRoutes } from './routes/exercises'
 import { templateRoutes } from './routes/templates'
 import { stripeWebhookRoutes, subscriptionRoutes } from './routes/stripe'
 import { adminRoutes } from './routes/admin'
+import { statsRoutes } from './routes/stats'
 
 const app = Fastify({ logger: true })
 
@@ -66,6 +67,8 @@ async function main() {
   app.register(subscriptionRoutes, { prefix: '/api/v1' })
   // Admin routes at /api/v1/admin/*
   app.register(adminRoutes, { prefix: '/api/v1/admin' })
+  // Stats routes at /api/v1/stats/*
+  app.register(statsRoutes, { prefix: '/api/v1' })
 
   const port = Number(process.env.PORT ?? 3000)
   await app.listen({ port, host: '0.0.0.0' })

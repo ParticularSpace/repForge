@@ -32,6 +32,9 @@ export default function HomePage() {
   const [type, setType] = useState<WorkoutType>('push')
   const [difficulty, setDifficulty] = useState<Difficulty>('beginner')
   const [repeatLoading, setRepeatLoading] = useState<string | null>(null)
+  const [profileBannerDismissed, setProfileBannerDismissed] = useState(
+    () => localStorage.getItem('profilePromptDismissed') === 'true'
+  )
 
   const { data: workouts } = useWorkouts()
   const { data: profile } = useProfile()
@@ -76,6 +79,35 @@ export default function HomePage() {
         <h1 className="text-2xl font-bold text-gray-900">{greeting}</h1>
         <p className="text-sm text-gray-400 mt-0.5">{fmtDay()}</p>
       </div>
+
+      {/* Profile setup banner */}
+      {!profileBannerDismissed && profile !== undefined &&
+        profile.age === null && profile.weightLbs === null && profile.fitnessGoal === null && (
+        <div className="bg-teal-50 border border-teal-100 rounded-2xl p-4 mb-5 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-teal-800 mb-0.5">Make workouts more personal →</p>
+            <p className="text-xs text-teal-600 leading-relaxed">
+              Add your age, weight, and goals so RepFlow can tailor AI workouts specifically to you.
+            </p>
+            <button
+              onClick={() => navigate('/profile')}
+              className="mt-2 text-xs font-semibold text-teal-700 underline underline-offset-2"
+            >
+              Set up profile
+            </button>
+          </div>
+          <button
+            onClick={() => {
+              localStorage.setItem('profilePromptDismissed', 'true')
+              setProfileBannerDismissed(true)
+            }}
+            className="text-teal-400 text-lg leading-none shrink-0 mt-0.5"
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Generator card */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-5 shadow-sm">
