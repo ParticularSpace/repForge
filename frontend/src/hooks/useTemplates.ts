@@ -53,7 +53,22 @@ export function useDeleteTemplate() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (templateId: string) => api.delete<void>(`/api/v1/templates/${templateId}`),
-    onSuccess: () => {
+    onMutate: async (templateId) => {
+      await queryClient.cancelQueries({ queryKey: ['templates'] })
+      const previous = queryClient.getQueryData<TemplatesResponse>(['templates'])
+      queryClient.setQueryData<TemplatesResponse>(['templates'], old => {
+        if (!old) return old
+        return {
+          manual: old.manual.filter(t => t.id !== templateId),
+          ai: old.ai.filter(t => t.id !== templateId),
+        }
+      })
+      return { previous }
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous) queryClient.setQueryData(['templates'], context.previous)
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['templates'] })
     },
   })
