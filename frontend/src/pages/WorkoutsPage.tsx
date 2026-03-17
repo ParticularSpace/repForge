@@ -74,9 +74,19 @@ function GenerateTab({ isPro }: { isPro: boolean }) {
         </div>
 
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Difficulty</p>
-        <div className="flex flex-wrap gap-2 mb-5">
+        <div className="grid grid-cols-3 gap-2 mb-5">
           {DIFFICULTIES.map(d => (
-            <Chip key={d.value} label={d.label} selected={difficulty === d.value} onClick={() => setDifficulty(d.value)} />
+            <button
+              key={d.value}
+              onClick={() => setDifficulty(d.value)}
+              className={`py-2 rounded-full text-sm font-medium border transition-colors text-center ${
+                difficulty === d.value
+                  ? 'bg-teal-600 border-teal-600 text-white'
+                  : 'bg-white border-gray-200 text-gray-600 hover:border-teal-400'
+              }`}
+            >
+              {d.label}
+            </button>
           ))}
         </div>
 
