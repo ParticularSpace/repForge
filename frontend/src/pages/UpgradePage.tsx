@@ -13,6 +13,7 @@ const FEATURES = [
   { name: 'Muscle focus targeting', free: false, pro: true },
   { name: 'Full workout history', free: true, pro: true },
   { name: 'Personal records', free: true, pro: true },
+  { name: 'AI coaching insights', free: false, pro: true },
   { name: 'Achievements & levels', free: true, pro: true },
 ]
 

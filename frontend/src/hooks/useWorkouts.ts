@@ -71,6 +71,8 @@ export function useCompleteWorkout() {
       qc.invalidateQueries({ queryKey: ['workouts'] })
       qc.invalidateQueries({ queryKey: ['workouts', id] })
       qc.invalidateQueries({ queryKey: ['home'] })
+      // Fire-and-forget coaching refresh so next home visit has fresh insight
+      api.post('/api/v1/coaching/insight', {}).catch(() => {})
     },
   })
 }

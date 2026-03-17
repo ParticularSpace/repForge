@@ -149,6 +149,11 @@ export interface HomeData {
     exerciseCount: number
     durationMin: number | null
   }>
+  coachingInsight: {
+    insight: string
+    action: string | null
+    actionType: string | null
+  } | null
 }
 
 export interface AchievementTier {

@@ -24,7 +24,7 @@ export async function getHeroTemplate(
   // 2. Fall back to most-used template (used at least twice)
   if (!template) {
     template = await prisma.workoutTemplate.findFirst({
-      where: { userId, useCount: { gte: 2 } },
+      where: { userId, useCount: { gte: 1 } },
       orderBy: [{ useCount: 'desc' }, { lastUsedAt: 'desc' }],
       include: { exercises: { orderBy: { order: 'asc' } } },
     })

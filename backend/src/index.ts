@@ -13,6 +13,7 @@ import { stripeWebhookRoutes, subscriptionRoutes } from './routes/stripe'
 import { adminRoutes } from './routes/admin'
 import { statsRoutes } from './routes/stats'
 import { homeRoutes } from './routes/home'
+import { coachingRoutes } from './routes/coaching'
 
 const app = Fastify({ logger: true })
 
@@ -72,6 +73,8 @@ async function main() {
   app.register(statsRoutes, { prefix: '/api/v1' })
   // Home route at /api/v1/home
   app.register(homeRoutes, { prefix: '/api/v1' })
+  // Coaching routes at /api/v1/coaching/*
+  app.register(coachingRoutes, { prefix: '/api/v1' })
 
   const port = Number(process.env.PORT ?? 3000)
   await app.listen({ port, host: '0.0.0.0' })
