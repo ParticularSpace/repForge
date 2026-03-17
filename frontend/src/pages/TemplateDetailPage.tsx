@@ -92,7 +92,7 @@ export default function TemplateDetailPage() {
       id: editTarget.id,
       sets: updated.sets,
       reps: updated.reps,
-      weightLbs: updated.weightLbs,
+      weightLbs: updated.weightLbs ?? undefined,
       restSeconds: updated.restSeconds,
     }])
     setEditTarget(null)
@@ -214,7 +214,7 @@ export default function TemplateDetailPage() {
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-gray-900 text-sm">{ex.name}</p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      {ex.sets} sets × {ex.reps} reps @ {formatWeight(ex.weightLbs)}
+                      {ex.sets} sets × {ex.reps} reps @ {formatWeight(ex.weightLbs, ex.isBodyweight)}
                       {ex.restSeconds ? ` · ${ex.restSeconds}s rest` : ''}
                     </p>
                   </div>

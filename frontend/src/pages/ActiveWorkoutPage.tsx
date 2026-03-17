@@ -176,7 +176,7 @@ export default function ActiveWorkoutPage() {
                 {nextEx.name}
                 <span className="text-sm text-gray-400 font-normal ml-2">
                   {nextEx.sets} × {nextEx.reps}
-                  {nextEx.weightLbs ? ` · ${nextEx.weightLbs} lbs` : ''}
+                  {` · ${nextEx.weightLbs ? `${nextEx.weightLbs} lbs` : 'No weight set'}`}
                 </span>
               </p>
             </div>

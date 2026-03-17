@@ -27,7 +27,7 @@ export default function TrackScreen() {
 
       <h2 className="text-xl font-bold text-gray-900 mb-2">Tap to track. Rest on autopilot.</h2>
       <p className="text-sm text-gray-500 leading-relaxed">
-        Each bubble is one set. Tap it when you're done. A rest timer starts automatically so you never have to watch the clock.
+        Each bubble is one set. Tap it when done. A rest timer starts automatically between sets.
       </p>
     </div>
   )

@@ -1,10 +1,12 @@
 export default function ProScreen() {
   return (
     <div className="flex flex-col items-center justify-center flex-1 px-8 text-center">
-      <h2 className="text-xl font-bold text-gray-900 mb-1">RepFlow is free to start.</h2>
-      <p className="text-sm text-gray-500 mb-6">You can upgrade anytime from your profile.</p>
+      <h2 className="text-xl font-bold text-gray-900 mb-1">Gets smarter as you train.</h2>
+      <p className="text-sm text-gray-500 mb-5">
+        RepFlow tracks your progress and offers coaching tips based on your actual workouts. Unlock full coaching and stats with Pro.
+      </p>
 
-      <div className="flex gap-3 w-full max-w-[300px] mb-6">
+      <div className="flex gap-3 w-full max-w-[300px]">
         {/* Free card */}
         <div className="flex-1 rounded-2xl border border-gray-200 bg-white p-4 text-left">
           <p className="text-sm font-bold text-gray-900 mb-3">Free</p>
@@ -31,7 +33,7 @@ export default function ProScreen() {
               'Unlimited AI',
               'Unlimited routines',
               'Full stats',
-              'All achievements',
+              'AI coaching insights',
               'Personal records',
             ].map(f => (
               <li key={f} className="flex items-start gap-1.5">

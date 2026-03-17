@@ -100,7 +100,8 @@ export function useTopTemplates() {
   return useQuery({
     queryKey: ['home-top-templates'],
     queryFn: () => api.get<Array<{ id: string; name: string; exerciseCount: number; useCount: number; lastUsedAt: string | null; exercises: string[] }>>('/api/v1/home/top-templates'),
-    staleTime: 30000,
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 }
 

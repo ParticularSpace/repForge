@@ -1,8 +1,9 @@
 import type { Exercise } from '@/types'
+import { formatWeight } from '@/lib/formatWeight'
 import SetBubbles from './SetBubbles'
 
 interface ExerciseCardProps {
-  exercise: Exercise
+  exercise: Exercise & { isBodyweight?: boolean }
   completedSets: number
   onSetTap: (setIndex: number) => void
   onNameTap?: () => void
@@ -10,7 +11,7 @@ interface ExerciseCardProps {
 
 export default function ExerciseCard({ exercise, completedSets, onSetTap, onNameTap }: ExerciseCardProps) {
   const meta = [
-    exercise.weightLbs ? `${exercise.weightLbs} lbs` : null,
+    formatWeight(exercise.weightLbs, exercise.isBodyweight),
     `${exercise.sets} sets`,
     `${exercise.reps} reps`,
   ]

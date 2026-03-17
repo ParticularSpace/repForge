@@ -60,6 +60,7 @@ model Exercise {
   sets         Int
   reps         Int
   weightLbs    Float?   @map("weight_lbs")
+  isBodyweight Boolean  @default(false) @map("is_bodyweight")
   notes        String?
   description  String?
   muscleGroups Json?    @map("muscle_groups") @default("[]")
@@ -137,6 +138,7 @@ model TemplateExercise {
   sets         Int
   reps         Int
   weightLbs    Float?          @map("weight_lbs")
+  isBodyweight Boolean         @default(false) @map("is_bodyweight")
   restSeconds  Int?            @map("rest_seconds")
   muscleGroups Json?           @map("muscle_groups") @default("[]")
   @@map("template_exercises")

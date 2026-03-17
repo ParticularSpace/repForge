@@ -281,6 +281,61 @@ Rules:
   })
 }
 
+export interface ExerciseSwap {
+  name: string
+  sets: number
+  reps: number
+  weightLbs: number
+  reason: string
+}
+
+export async function generateExerciseSwap(
+  userId: string,
+  exerciseName: string,
+  templateContext: string[],
+  prisma: PrismaClient
+): Promise<ExerciseSwap> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      age: true, weightLbs: true, heightIn: true, gender: true,
+      fitnessGoal: true, experienceNotes: true, equipmentPreferences: true,
+    },
+  })
+
+  const profileCtx = user ? buildProfileContext({
+    age: user.age,
+    weightLbs: user.weightLbs,
+    heightIn: user.heightIn,
+    gender: user.gender,
+    fitnessGoal: user.fitnessGoal,
+    experienceNotes: user.experienceNotes,
+    equipmentPreferences: (user.equipmentPreferences as string[]) ?? [],
+  }) : 'No profile data'
+
+  const prompt = `You are a personal trainer. Suggest ONE alternative exercise to replace ${sanitize(exerciseName)}.
+
+User profile:
+${profileCtx}
+
+Current workout includes: ${templateContext.map(n => sanitize(n)).join(', ')}
+
+The alternative should work the same muscle groups but offer variety or better fit the user's profile.
+
+Return ONLY JSON:
+{"name":"Incline Dumbbell Press","sets":3,"reps":10,"weightLbs":40,"reason":"One sentence why this is a good swap. Max 15 words."}`
+
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 120,
+    messages: [{ role: 'user', content: prompt }],
+  })
+
+  const raw = (response.content[0] as { text: string }).text.trim()
+  const cleaned = raw.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim()
+  return JSON.parse(cleaned) as ExerciseSwap
+}
+
 export async function generateExerciseRecommendation(
   userId: string,
   exerciseName: string,

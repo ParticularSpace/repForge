@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useCreateWorkout, useGenerateWorkout, useProfile } from '@/hooks/useWorkouts'
+import { useCreateWorkout, useProfile } from '@/hooks/useWorkouts'
 import ExerciseInfoModal from '@/components/workout/ExerciseInfoModal'
 import EditExerciseModal from '@/components/workout/EditExerciseModal'
 import AddExerciseSheet from '@/components/workout/AddExerciseSheet'
 import { formatWeight } from '@/lib/formatWeight'
+import { api } from '@/lib/api'
 import type { WorkoutPlan, WorkoutType, Difficulty, ExercisePlan } from '@/types'
 
 interface PreviewState {
@@ -13,13 +14,131 @@ interface PreviewState {
   difficulty: Difficulty
 }
 
+interface SwapSuggestion {
+  name: string
+  sets: number
+  reps: number
+  weightLbs: number
+  reason: string
+}
+
+function SwapSheet({
+  exercise,
+  exerciseList,
+  onSwap,
+  onClose,
+}: {
+  exercise: ExercisePlan
+  exerciseList: { name: string; order: number }[]
+  onSwap: (ex: ExercisePlan) => void
+  onClose: () => void
+}) {
+  const [suggestion, setSuggestion] = useState<SwapSuggestion | 'loading' | null>(null)
+  const [showSearch, setShowSearch] = useState(false)
+
+  const handleSuggest = async () => {
+    setSuggestion('loading')
+    try {
+      const result = await api.post<SwapSuggestion>('/api/v1/coaching/exercise-swap', {
+        exerciseName: exercise.name,
+        templateContext: exerciseList.map(e => e.name),
+      })
+      setSuggestion(result)
+    } catch {
+      setSuggestion(null)
+    }
+  }
+
+  const handleUseSuggestion = () => {
+    if (!suggestion || suggestion === 'loading') return
+    onSwap({
+      ...exercise,
+      name: suggestion.name,
+      sets: suggestion.sets,
+      reps: suggestion.reps,
+      weightLbs: suggestion.weightLbs,
+    })
+  }
+
+  if (showSearch) {
+    return (
+      <AddExerciseSheet
+        isOpen={true}
+        onClose={onClose}
+        onAdd={data => {
+          onSwap({ ...exercise, name: data.name, sets: data.sets, reps: data.reps, weightLbs: data.weightLbs })
+        }}
+        context="preview"
+        exerciseList={exerciseList}
+        defaultRestSeconds={exercise.restSeconds ?? 60}
+      />
+    )
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl px-5 pt-5 pb-[calc(env(safe-area-inset-bottom,0px)+24px)] max-h-[80vh] overflow-y-auto">
+        <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
+        <p className="font-semibold text-gray-900 mb-4">Replace {exercise.name}</p>
+
+        {!suggestion && (
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => setShowSearch(true)}
+              className="w-full border border-gray-200 rounded-xl py-3.5 text-sm font-medium text-gray-700 text-left px-4"
+            >
+              Search for a different exercise
+            </button>
+            <button
+              onClick={handleSuggest}
+              className="w-full bg-teal-600 text-white rounded-xl py-3.5 text-sm font-semibold"
+            >
+              Suggest an alternative
+            </button>
+          </div>
+        )}
+
+        {suggestion === 'loading' && (
+          <div className="flex justify-center py-8">
+            <span className="h-6 w-6 animate-spin rounded-full border-2 border-teal-600 border-t-transparent" />
+          </div>
+        )}
+
+        {suggestion && suggestion !== 'loading' && (
+          <div className="bg-teal-50 rounded-xl p-4 mb-4">
+            <p className="font-semibold text-gray-900 text-sm mb-0.5">{suggestion.name}</p>
+            <p className="text-xs text-gray-500 mb-2">
+              {suggestion.sets} × {suggestion.reps} @ {formatWeight(suggestion.weightLbs)}
+            </p>
+            <p className="text-xs italic text-gray-500 mb-4">"{suggestion.reason}"</p>
+            <div className="flex gap-2">
+              <button
+                onClick={handleUseSuggestion}
+                className="flex-1 bg-teal-600 text-white rounded-lg py-2.5 text-sm font-semibold"
+              >
+                Use this
+              </button>
+              <button
+                onClick={() => { setSuggestion(null); setShowSearch(true) }}
+                className="flex-1 border border-gray-200 text-gray-600 rounded-lg py-2.5 text-sm font-medium"
+              >
+                Search instead
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
 export default function WorkoutPreviewPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const state = location.state as PreviewState | null
 
   const create = useCreateWorkout()
-  const generate = useGenerateWorkout()
   const { data: profile } = useProfile()
 
   const [plan, setPlan] = useState<WorkoutPlan>(() => state?.plan ?? { name: '', exercises: [] })
@@ -28,6 +147,7 @@ export default function WorkoutPreviewPage() {
   )
   const [infoExercise, setInfoExercise] = useState<ExercisePlan | null>(null)
   const [editExercise, setEditExercise] = useState<{ ex: ExercisePlan; index: number } | null>(null)
+  const [swapExercise, setSwapExercise] = useState<{ ex: ExercisePlan; index: number } | null>(null)
   const [expandedMods, setExpandedMods] = useState<Set<number>>(new Set())
   const [showAddSheet, setShowAddSheet] = useState(false)
 
@@ -71,6 +191,15 @@ export default function WorkoutPreviewPage() {
     setEditExercise(null)
   }
 
+  const handleSwapExercise = (updated: ExercisePlan) => {
+    if (swapExercise === null) return
+    setPlan(prev => ({
+      ...prev,
+      exercises: prev.exercises.map((ex, i) => i === swapExercise.index ? { ...updated, order: ex.order } : ex),
+    }))
+    setSwapExercise(null)
+  }
+
   const handleAddExercise = (data: {
     name: string; sets: number; reps: number; weightLbs: number
     restSeconds: number; muscleGroups?: string[]; insertAfterOrder?: number
@@ -102,17 +231,8 @@ export default function WorkoutPreviewPage() {
     navigate(`/workout/${workout.id}/active`, { replace: true })
   }
 
-  const handleRegenerate = async () => {
-    const newPlan = await generate.mutateAsync({ type, difficulty })
-    setPlan(newPlan)
-    setSelected(new Set(newPlan.exercises.map((_, i) => i)))
-    setExpandedMods(new Set())
-  }
-
-  const isBusy = create.isPending || generate.isPending
-  const errorMsg = (create.error || generate.error)
-    ? ((create.error || generate.error) as Error).message
-    : null
+  const isBusy = create.isPending
+  const errorMsg = create.error ? (create.error as Error).message : null
 
   return (
     <>
@@ -192,10 +312,19 @@ export default function WorkoutPreviewPage() {
                             <path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7"/>
                           </svg>
                         </button>
+                        <button
+                          onClick={e => { e.stopPropagation(); setSwapExercise({ ex, index: i }) }}
+                          className="text-gray-300 hover:text-teal-500 transition-colors shrink-0 flex items-center justify-center min-w-[44px] min-h-[44px]"
+                          aria-label={`Swap ${ex.name}`}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M1 4h10M11 4l-3-3M15 12H5M5 12l3 3"/>
+                          </svg>
+                        </button>
                       </div>
                       <p className="text-sm text-gray-400 mt-0.5">
                         {ex.sets} sets × {ex.reps} reps
-                        {ex.weightLbs != null ? ` · ${formatWeight(ex.weightLbs)}` : ''}
+                        {` · ${formatWeight(ex.weightLbs, ex.isBodyweight)}`}
                       </p>
                       {ex.notes && !ex.coachingCue && (
                         <p className="text-xs italic text-gray-400 mt-1.5">{ex.notes}</p>
@@ -239,20 +368,11 @@ export default function WorkoutPreviewPage() {
         {errorMsg && (
           <p className="text-xs text-red-500 text-center bg-red-50 rounded-lg py-2 px-3 mb-2">{errorMsg}</p>
         )}
-        <div className="flex gap-3 max-w-lg mx-auto">
-          <button
-            onClick={handleRegenerate}
-            disabled={isBusy}
-            className="flex-1 border border-gray-200 text-gray-600 rounded-xl py-3.5 font-medium disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
-          >
-            {generate.isPending
-              ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" /> Generating…</>
-              : 'Regenerate'}
-          </button>
+        <div className="max-w-lg mx-auto">
           <button
             onClick={handleStart}
             disabled={isBusy}
-            className="flex-[2] bg-teal-600 text-white rounded-xl py-3.5 font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full bg-teal-600 text-white rounded-xl py-3.5 font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {create.isPending
               ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Starting…</>
@@ -272,6 +392,15 @@ export default function WorkoutPreviewPage() {
         defaultRestSeconds={profile?.preferredRestSeconds ?? 60}
         onSave={handleSaveExercise}
         onClose={() => setEditExercise(null)}
+      />
+    )}
+
+    {swapExercise && (
+      <SwapSheet
+        exercise={swapExercise.ex}
+        exerciseList={plan.exercises.map(e => ({ name: e.name, order: e.order }))}
+        onSwap={handleSwapExercise}
+        onClose={() => setSwapExercise(null)}
       />
     )}
 

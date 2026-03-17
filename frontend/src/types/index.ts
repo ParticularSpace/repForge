@@ -55,7 +55,8 @@ export interface ExercisePlan {
   order: number
   sets: number
   reps: number
-  weightLbs?: number
+  weightLbs?: number | null
+  isBodyweight?: boolean
   restSeconds?: number
   notes?: string
   description?: string
@@ -223,6 +224,7 @@ export interface TemplateExercise {
   sets: number
   reps: number
   weightLbs?: number | null
+  isBodyweight?: boolean
   restSeconds?: number | null
   muscleGroups: string[]
 }

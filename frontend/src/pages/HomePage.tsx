@@ -1,10 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useHomeData, usePinTemplate, useTopTemplates, useProfile } from '@/hooks/useWorkouts'
+import { useHomeData, usePinTemplate, useTopTemplates, useProfile, useWorkouts } from '@/hooks/useWorkouts'
 import { useStartTemplate } from '@/hooks/useTemplates'
 import { useSubscription } from '@/hooks/useSubscription'
-import { useWorkouts } from '@/hooks/useWorkouts'
-import { api } from '@/lib/api'
 import type { Workout } from '@/types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -47,8 +45,10 @@ function HomeSkeleton() {
 
 // ─── Switch Routine Sheet ──────────────────────────────────────────────────────
 function SwitchSheet({ onClose, currentHeroId }: { onClose: () => void; currentHeroId: string }) {
-  const { data: templates, isLoading } = useTopTemplates()
+  const { data: templates, isLoading, refetch } = useTopTemplates()
   const pinTemplate = usePinTemplate()
+
+  useEffect(() => { refetch() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePin = async (templateId: string) => {
     await pinTemplate.mutateAsync(templateId)
@@ -255,7 +255,7 @@ export default function HomePage() {
   const { data: profile } = useProfile()
   const { data: workouts } = useWorkouts()
   const { isPro } = useSubscription()
-  const [repeatLoading, setRepeatLoading] = useState<string | null>(null)
+  const [repeatLoading] = useState<string | null>(null)
 
   const greeting = timeGreeting()
   const name = profile?.displayName ?? null
@@ -285,21 +285,8 @@ export default function HomePage() {
     }
   }
 
-  const handleRepeat = async (workout: Workout) => {
-    setRepeatLoading(workout.id)
-    try {
-      const full = await api.get<Workout>(`/api/v1/workouts/${workout.id}`)
-      const plan = {
-        name: full.name,
-        exercises: (full.exercises ?? []).map(e => ({
-          name: e.name, order: e.order, sets: e.sets,
-          reps: e.reps, weightLbs: e.weightLbs, notes: e.notes,
-        })),
-      }
-      navigate('/workout/preview', { state: { plan, type: full.type, difficulty: full.difficulty } })
-    } finally {
-      setRepeatLoading(null)
-    }
+  const handleView = (workout: Workout) => {
+    navigate(`/workout/${workout.id}`)
   }
 
   const recentWorkouts = homeData?.recentWorkouts ?? []
@@ -401,11 +388,10 @@ export default function HomePage() {
                   </div>
                   {fullWorkout && (
                     <button
-                      onClick={() => handleRepeat(fullWorkout)}
-                      disabled={repeatLoading === w.id}
-                      className="text-sm font-semibold text-teal-600 disabled:opacity-50 ml-4 shrink-0 py-1 px-2"
+                      onClick={() => handleView(fullWorkout)}
+                      className="text-sm font-semibold text-teal-600 ml-4 shrink-0 py-1 px-2"
                     >
-                      {repeatLoading === w.id ? '…' : 'Repeat ›'}
+                      View ›
                     </button>
                   )}
                 </div>

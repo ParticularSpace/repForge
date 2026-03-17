@@ -12,6 +12,7 @@ export default function EditExerciseModal({ exercise, defaultRestSeconds = 60, o
   const [sets, setSets] = useState(exercise.sets)
   const [reps, setReps] = useState(exercise.reps)
   const [weight, setWeight] = useState(exercise.weightLbs ?? 0)
+  const [isBodyweight, setIsBodyweight] = useState(exercise.isBodyweight ?? false)
   const [rest, setRest] = useState(exercise.restSeconds ?? defaultRestSeconds)
 
   useEffect(() => {
@@ -21,7 +22,14 @@ export default function EditExerciseModal({ exercise, defaultRestSeconds = 60, o
   }, [onClose])
 
   const handleSave = () => {
-    onSave({ ...exercise, sets, reps, weightLbs: weight, restSeconds: rest })
+    onSave({
+      ...exercise,
+      sets,
+      reps,
+      weightLbs: isBodyweight ? null : weight,
+      isBodyweight,
+      restSeconds: rest,
+    })
   }
 
   const numInput = (
@@ -71,7 +79,7 @@ export default function EditExerciseModal({ exercise, defaultRestSeconds = 60, o
         </div>
 
         {/* 2×2 input grid */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-2 gap-4 mb-3">
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1.5">Sets</label>
             {numInput(sets, setSets, 1, 10)}
@@ -81,14 +89,42 @@ export default function EditExerciseModal({ exercise, defaultRestSeconds = 60, o
             {numInput(reps, setReps, 1, 50)}
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1.5">Weight (lbs) · 0 = bodyweight</label>
-            {numInput(weight, setWeight, 0, 2000)}
+            <label className="block text-xs font-semibold text-gray-500 mb-1.5">Weight (lbs)</label>
+            <input
+              type="number"
+              value={isBodyweight ? '' : weight}
+              min={0}
+              max={2000}
+              step={1}
+              disabled={isBodyweight}
+              onChange={e => {
+                const v = Number(e.target.value)
+                if (!isNaN(v)) setWeight(Math.min(2000, Math.max(0, v)))
+              }}
+              className={`w-full h-12 rounded-xl border border-gray-200 px-3 text-center text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                isBodyweight ? 'bg-gray-100 text-gray-300' : 'bg-gray-50 text-gray-900'
+              }`}
+            />
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1.5">Rest (sec)</label>
             {numInput(rest, setRest, 30, 300, 15)}
           </div>
         </div>
+
+        {/* Bodyweight toggle */}
+        <label className="flex items-center gap-2 mb-6 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={isBodyweight}
+            onChange={e => {
+              setIsBodyweight(e.target.checked)
+              if (e.target.checked) setWeight(0)
+            }}
+            className="w-4 h-4 rounded accent-teal-600"
+          />
+          <span className="text-[13px] text-gray-500">Bodyweight exercise (no added weight)</span>
+        </label>
 
         {/* Buttons */}
         <div className="flex gap-3">

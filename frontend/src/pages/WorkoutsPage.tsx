@@ -297,6 +297,7 @@ function BuildTab({ editingTemplate }: { editingTemplate?: WorkoutTemplate }) {
   const [showCustomForm, setShowCustomForm] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState(false)
+  const [toastMessage, setToastMessage] = useState('Routine saved')
 
   const addFromLibrary = (lib: LibraryExercise) => {
     const ex: BuildExercise = {
@@ -346,21 +347,44 @@ function BuildTab({ editingTemplate }: { editingTemplate?: WorkoutTemplate }) {
     })
   }
 
-  const handleStart = async () => {
-    if (exercises.length === 0) { setError('Add at least one exercise.'); return }
+  const validateAndGetName = (): string | null => {
+    if (exercises.length === 0) { setError('Add at least one exercise.'); return null }
     setError(null)
     const day = new Date().toLocaleDateString('en-US', { weekday: 'long' })
-    const name = workoutName.trim() || `My workout · ${day}`
+    return workoutName.trim() || `My routine · ${day}`
+  }
+
+  const buildTemplateExercises = () => exercises.map(e => ({
+    name: e.name, order: e.order, sets: e.sets, reps: e.reps,
+    weightLbs: e.weightLbs ?? undefined, restSeconds: e.restSeconds, muscleGroups: e.muscleGroups ?? [],
+  }))
+
+  const handleSaveRoutine = async () => {
+    const name = validateAndGetName()
+    if (!name) return
+    const templateExercises = buildTemplateExercises()
+    if (editingTemplate) {
+      await updateTemplate.mutateAsync({ id: editingTemplate.id, data: { name, type: workoutType, exercises: templateExercises } })
+    } else {
+      await createTemplate.mutateAsync({ name, type: workoutType, source: 'manual', exercises: templateExercises })
+    }
+    setToastMessage('Routine saved')
+    setToast(true)
+    setTimeout(() => {
+      navigate('/workouts', { state: { activeTab: 'templates' }, replace: true })
+    }, 800)
+  }
+
+  const handleStart = async () => {
+    const name = validateAndGetName()
+    if (!name) return
 
     const workoutPromise = createWorkout.mutateAsync({
       name, type: workoutType, difficulty: 'intermediate', exercises, source: 'manual',
     })
 
     // Auto-save template (fire and forget)
-    const templateExercises = exercises.map(e => ({
-      name: e.name, order: e.order, sets: e.sets, reps: e.reps,
-      weightLbs: e.weightLbs, restSeconds: e.restSeconds, muscleGroups: e.muscleGroups ?? [],
-    }))
+    const templateExercises = buildTemplateExercises()
     if (editingTemplate) {
       updateTemplate.mutate({ id: editingTemplate.id, data: { name, type: workoutType, exercises: templateExercises } })
     } else {
@@ -368,6 +392,7 @@ function BuildTab({ editingTemplate }: { editingTemplate?: WorkoutTemplate }) {
     }
 
     const workout = await workoutPromise
+    setToastMessage('Saved to routines. Starting workout…')
     setToast(true)
     setTimeout(() => {
       navigate(`/workout/${workout.id}/active`, { replace: true })
@@ -412,7 +437,7 @@ function BuildTab({ editingTemplate }: { editingTemplate?: WorkoutTemplate }) {
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-gray-900 text-sm">{ex.name}</p>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  {ex.sets} × {ex.reps} @ {formatWeight(ex.weightLbs)}
+                  {ex.sets} × {ex.reps} @ {formatWeight(ex.weightLbs, (ex as any).isBodyweight)}
                 </p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
@@ -446,18 +471,29 @@ function BuildTab({ editingTemplate }: { editingTemplate?: WorkoutTemplate }) {
 
       {error && <p className="text-xs text-red-500 mt-3">{error}</p>}
 
-      {/* Start button */}
-      <div className="mt-5">
-        <button
-          onClick={handleStart}
-          disabled={createWorkout.isPending}
-          className="w-full bg-teal-600 text-white rounded-xl py-3.5 font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          {createWorkout.isPending
-            ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Starting…</>
-            : 'Start workout'}
-        </button>
-      </div>
+      {/* Action buttons — only shown when exercises added */}
+      {exercises.length > 0 && (
+        <div className="mt-5 flex flex-col gap-2">
+          <button
+            onClick={handleSaveRoutine}
+            disabled={createTemplate.isPending || updateTemplate.isPending}
+            className="w-full border border-gray-200 text-gray-600 rounded-xl py-3.5 font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {(createTemplate.isPending || updateTemplate.isPending)
+              ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" /> Saving…</>
+              : 'Save routine'}
+          </button>
+          <button
+            onClick={handleStart}
+            disabled={createWorkout.isPending}
+            className="w-full bg-teal-600 text-white rounded-xl py-3.5 font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {createWorkout.isPending
+              ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Starting…</>
+              : 'Start workout'}
+          </button>
+        </div>
+      )}
 
       {editTarget && (
         <EditExerciseModal
@@ -468,7 +504,7 @@ function BuildTab({ editingTemplate }: { editingTemplate?: WorkoutTemplate }) {
         />
       )}
 
-      {toast && <Toast message="Routine saved!" onDone={() => setToast(false)} />}
+      {toast && <Toast message={toastMessage} onDone={() => setToast(false)} />}
     </div>
   )
 }

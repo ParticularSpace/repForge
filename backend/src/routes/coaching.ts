@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { authenticate } from '../middleware/auth'
 import { prisma } from '../lib/prisma'
-import { generateAndCacheInsight, generateExerciseRecommendation } from '../lib/coaching'
+import { generateAndCacheInsight, generateExerciseRecommendation, generateExerciseSwap } from '../lib/coaching'
 
 export async function coachingRoutes(app: FastifyInstance) {
   // POST /coaching/insight — generate (or refresh) and cache a coaching insight
@@ -36,6 +36,29 @@ export async function coachingRoutes(app: FastifyInstance) {
     } catch (err) {
       app.log.error(err, 'coaching/exercise-recommendation failed')
       return reply.status(500).send({ error: 'Failed to generate recommendation' })
+    }
+  })
+
+  // POST /coaching/exercise-swap — suggest one alternative exercise
+  app.post('/coaching/exercise-swap', { preHandler: [authenticate] }, async (request, reply) => {
+    const userId = request.user.id
+    const { exerciseName, templateContext } = request.body as { exerciseName: string; templateContext: string[] }
+
+    if (!exerciseName?.trim()) {
+      return reply.status(400).send({ error: 'exerciseName is required' })
+    }
+
+    try {
+      const swap = await generateExerciseSwap(
+        userId,
+        exerciseName.trim(),
+        Array.isArray(templateContext) ? templateContext : [],
+        prisma
+      )
+      return swap
+    } catch (err) {
+      app.log.error(err, 'coaching/exercise-swap failed')
+      return reply.status(500).send({ error: 'Failed to generate swap suggestion' })
     }
   })
 }
