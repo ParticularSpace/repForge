@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useHomeData, usePinTemplate, useTopTemplates, useProfile, useWorkouts } from '@/hooks/useWorkouts'
+import { useHomeData, usePinTemplate, useTopTemplates, useProfile } from '@/hooks/useWorkouts'
 import { useStartTemplate } from '@/hooks/useTemplates'
 import { useSubscription } from '@/hooks/useSubscription'
-import type { Workout } from '@/types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function timeGreeting(): string {
@@ -13,8 +12,11 @@ function timeGreeting(): string {
   return 'Good evening'
 }
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+function relativeTime(iso: string): string {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  return `${days} days ago`
 }
 
 function lastSessionLabel(days: number | null): { text: string; color: string } {
@@ -253,9 +255,7 @@ export default function HomePage() {
   const navigate = useNavigate()
   const { data: homeData, isLoading } = useHomeData()
   const { data: profile } = useProfile()
-  const { data: workouts } = useWorkouts()
   const { isPro } = useSubscription()
-  const [repeatLoading] = useState<string | null>(null)
 
   const greeting = timeGreeting()
   const name = profile?.displayName ?? null
@@ -283,10 +283,6 @@ export default function HomePage() {
       case 'rest':
         break
     }
-  }
-
-  const handleView = (workout: Workout) => {
-    navigate(`/workout/${workout.id}`)
   }
 
   const recentWorkouts = homeData?.recentWorkouts ?? []
@@ -374,29 +370,25 @@ export default function HomePage() {
         <div>
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Recent workouts</p>
           <div className="flex flex-col gap-3">
-            {recentWorkouts.map(w => {
-              const fullWorkout = workouts?.find(wk => wk.id === w.id)
-              return (
-                <div key={w.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center justify-between shadow-sm">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-gray-900 text-sm truncate">{w.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {w.completedAt ? fmtDate(w.completedAt) : ''}
-                      {w.exerciseCount ? ` · ${w.exerciseCount} exercises` : ''}
-                      {w.durationMin ? ` · ${w.durationMin} min` : ''}
-                    </p>
-                  </div>
-                  {fullWorkout && (
-                    <button
-                      onClick={() => handleView(fullWorkout)}
-                      className="text-sm font-semibold text-teal-600 ml-4 shrink-0 py-1 px-2"
-                    >
-                      View ›
-                    </button>
-                  )}
+            {recentWorkouts.map(w => (
+              <div key={w.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center justify-between shadow-sm">
+                <div className="min-w-0">
+                  <p className="font-semibold text-gray-900 text-sm truncate">{w.name}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {w.sessionCount > 1
+                      ? `Used ${w.sessionCount} times · `
+                      : 'First session · '}
+                    {w.completedAt ? relativeTime(w.completedAt) : ''}
+                  </p>
                 </div>
-              )
-            })}
+                <button
+                  onClick={() => navigate(`/workout/${w.id}`)}
+                  className="text-sm font-semibold text-teal-600 ml-4 shrink-0 py-1 px-2"
+                >
+                  View ›
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       )}

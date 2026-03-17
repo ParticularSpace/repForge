@@ -149,6 +149,7 @@ export interface HomeData {
     completedAt: string | null
     exerciseCount: number
     durationMin: number | null
+    sessionCount: number
   }>
   coachingInsight: {
     insight: string

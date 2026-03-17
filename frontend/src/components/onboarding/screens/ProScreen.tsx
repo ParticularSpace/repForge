@@ -30,15 +30,19 @@ export default function ProScreen() {
           <p className="text-xs text-teal-500 font-medium mb-3">$5.99/mo</p>
           <ul className="space-y-2">
             {[
-              'Unlimited AI',
-              'Unlimited routines',
-              'Full stats',
-              'AI coaching insights',
-              'Personal records',
+              { text: 'Unlimited AI', note: null },
+              { text: 'Unlimited routines', note: null },
+              { text: 'Full stats', note: null },
+              { text: 'AI coaching insights', note: 'personalised to your goals' },
+              { text: 'Personal records', note: null },
+              { text: 'All achievements', note: null },
             ].map(f => (
-              <li key={f} className="flex items-start gap-1.5">
+              <li key={f.text} className="flex items-start gap-1.5">
                 <span className="text-teal-500 text-xs mt-0.5">✓</span>
-                <span className="text-xs text-teal-700">{f}</span>
+                <span className="text-xs text-teal-700">
+                  {f.text}
+                  {f.note && <span className="text-teal-400"> — {f.note}</span>}
+                </span>
               </li>
             ))}
           </ul>

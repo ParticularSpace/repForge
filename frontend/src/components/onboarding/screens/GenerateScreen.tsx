@@ -32,8 +32,11 @@ export default function GenerateScreen() {
       </div>
 
       <h2 className="text-xl font-bold text-gray-900 mb-2">Your routine, front and center.</h2>
-      <p className="text-sm text-gray-500 leading-relaxed">
+      <p className="text-sm text-gray-500 leading-relaxed mb-3">
         RepFlow remembers what you train and puts it one tap away. The more you use it, the smarter it gets.
+      </p>
+      <p className="text-[11px] text-gray-400 leading-relaxed">
+        The more you share about your goals, the more personalised your workouts become.
       </p>
     </div>
   )

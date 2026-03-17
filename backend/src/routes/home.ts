@@ -32,17 +32,40 @@ export async function homeRoutes(app: FastifyInstance) {
 
     await syncWeeklyGoals(userId, goal, prisma)
 
-    const [weeklyProgress, weeklyStreak, heroTemplate, recentWorkouts] = await Promise.all([
+    const [weeklyProgress, weeklyStreak, heroTemplate, rawRecent] = await Promise.all([
       getCurrentWeekProgress(userId, goal, prisma),
       getWeeklyStreak(userId, prisma),
       getHeroTemplate(userId, pinnedTemplateId, prisma),
       prisma.workout.findMany({
         where: { userId, completedAt: { not: null } },
         orderBy: { completedAt: 'desc' },
-        take: 3,
-        include: { _count: { select: { exercises: true } } },
+        take: 20,
+        select: { id: true, name: true, completedAt: true, durationMin: true, _count: { select: { exercises: true } } },
       }),
     ])
+
+    // Deduplicate by name (case-insensitive), keep most recent per name
+    const seen = new Set<string>()
+    const deduped = rawRecent.filter(w => {
+      const key = w.name.toLowerCase().trim()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    }).slice(0, 3)
+
+    // Parallel count queries for each deduplicated workout
+    const recentWorkouts = await Promise.all(
+      deduped.map(async w => ({
+        id: w.id,
+        name: w.name,
+        completedAt: w.completedAt?.toISOString() ?? null,
+        exerciseCount: w._count.exercises,
+        durationMin: w.durationMin,
+        sessionCount: await prisma.workout.count({
+          where: { userId, name: { equals: w.name, mode: 'insensitive' }, completedAt: { not: null } },
+        }),
+      }))
+    )
 
     // Coaching insight — read from DB cache
     const pro = isPro({
@@ -76,13 +99,7 @@ export async function homeRoutes(app: FastifyInstance) {
         met: weeklyProgress.met,
         currentWeeklyStreak: weeklyStreak,
       },
-      recentWorkouts: recentWorkouts.map(w => ({
-        id: w.id,
-        name: w.name,
-        completedAt: w.completedAt?.toISOString() ?? null,
-        exerciseCount: w._count.exercises,
-        durationMin: w.durationMin,
-      })),
+      recentWorkouts,
       coachingInsight,
     }
   })
