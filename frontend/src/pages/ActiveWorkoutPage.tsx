@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useWorkout, useCompleteWorkout, useLogSet, useProfile, useAddExerciseToWorkout } from '@/hooks/useWorkouts'
+import { useWorkout, useCompleteWorkout, useLogSet, useProfile } from '@/hooks/useWorkouts'
 import ExerciseCard from '@/components/workout/ExerciseCard'
 import RestTimer from '@/components/workout/RestTimer'
 import ExerciseInfoModal from '@/components/workout/ExerciseInfoModal'
-import AddExerciseSheet from '@/components/workout/AddExerciseSheet'
 import type { Exercise } from '@/types'
 
 function formatTime(seconds: number) {
@@ -20,7 +19,6 @@ export default function ActiveWorkoutPage() {
   const { data: profile } = useProfile()
   const complete = useCompleteWorkout()
   const logSet = useLogSet()
-  const addExerciseMutation = useAddExerciseToWorkout(id!)
   const restSeconds = profile?.preferredRestSeconds ?? 60
 
   const [exercises, setExercises] = useState<Exercise[]>([])
@@ -30,7 +28,6 @@ export default function ActiveWorkoutPage() {
   const [elapsed, setElapsed] = useState(0)
   const [showEndConfirm, setShowEndConfirm] = useState(false)
   const [infoExercise, setInfoExercise] = useState<Exercise | null>(null)
-  const [showAddSheet, setShowAddSheet] = useState(false)
   const elapsedRef = useRef(0)
 
   // Initialize exercises from fetched workout (only once)
@@ -48,27 +45,6 @@ export default function ActiveWorkoutPage() {
   }, [])
 
   const currentEx = exercises[currentExIdx]
-
-  const handleAddExercise = async (data: {
-    name: string; sets: number; reps: number; weightLbs: number
-    restSeconds: number; muscleGroups?: string[]; insertAfterOrder?: number
-  }) => {
-    const newEx = await addExerciseMutation.mutateAsync({
-      name: data.name, sets: data.sets, reps: data.reps,
-      weightLbs: data.weightLbs, muscleGroups: data.muscleGroups,
-      insertAfterOrder: data.insertAfterOrder,
-    })
-    setExercises(prev => {
-      if (data.insertAfterOrder !== undefined) {
-        const idx = prev.findIndex(e => e.order === data.insertAfterOrder)
-        const next = [...prev]
-        next.splice(idx + 1, 0, { ...newEx, setLogs: [] })
-        return next.map((e, i) => ({ ...e, order: i + 1 }))
-      }
-      return [...prev, { ...newEx, setLogs: [] }]
-    })
-    setShowAddSheet(false)
-  }
 
   const finishWorkout = useCallback(() => {
     const durationMin = Math.max(1, Math.round(elapsedRef.current / 60))
@@ -197,12 +173,20 @@ export default function ActiveWorkoutPage() {
             </div>
           )}
 
-          <button
-            onClick={() => setShowAddSheet(true)}
-            className="w-full flex items-center justify-center gap-2 py-3 text-teal-600 font-medium text-sm border-t border-gray-100 mt-2"
-          >
-            <span className="text-lg leading-none">+</span> Add exercise
-          </button>
+          {(currentEx.coachingCue || currentEx.description) && (
+            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Form tips</p>
+              {currentEx.coachingCue && (
+                <div className="flex items-start gap-2 mb-2">
+                  <span className="text-base leading-none mt-0.5">💡</span>
+                  <p className="text-sm font-medium text-teal-700 leading-snug">{currentEx.coachingCue}</p>
+                </div>
+              )}
+              {currentEx.description && (
+                <p className="text-sm text-gray-500 leading-relaxed mt-2">{currentEx.description}</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -244,16 +228,6 @@ export default function ActiveWorkoutPage() {
       {infoExercise && (
         <ExerciseInfoModal exercise={infoExercise} onClose={() => setInfoExercise(null)} />
       )}
-
-      <AddExerciseSheet
-        isOpen={showAddSheet}
-        onClose={() => setShowAddSheet(false)}
-        onAdd={handleAddExercise}
-        context="active"
-        currentExOrder={currentEx?.order}
-        exerciseList={exercises.map(e => ({ name: e.name, order: e.order }))}
-        defaultRestSeconds={restSeconds}
-      />
     </div>
   )
 }

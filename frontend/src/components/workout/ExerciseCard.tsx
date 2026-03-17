@@ -33,11 +33,6 @@ export default function ExerciseCard({ exercise, completedSets, onSetTap, onName
         completedSets={completedSets}
         onTap={onSetTap}
       />
-      {(exercise.coachingCue || exercise.notes) && (
-        <p className="mt-3 text-xs italic text-gray-400">
-          "{exercise.coachingCue ?? exercise.notes}"
-        </p>
-      )}
     </div>
   )
 }

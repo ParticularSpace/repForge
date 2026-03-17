@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { useGenerateWorkout, useCreateWorkout, useProfile } from '@/hooks/useWorkouts'
 import { useSubscription } from '@/hooks/useSubscription'
-import { useTemplates, useCreateTemplate, useUpdateTemplate } from '@/hooks/useTemplates'
+import { useTemplates, useCreateTemplate, useUpdateTemplate, useDeleteTemplate } from '@/hooks/useTemplates'
 import { useExerciseSearch, useCreateExercise } from '@/hooks/useExerciseLibrary'
 import EditExerciseModal from '@/components/workout/EditExerciseModal'
 import Toast from '@/components/ui/Toast'
@@ -509,6 +509,109 @@ function BuildTab({ editingTemplate }: { editingTemplate?: WorkoutTemplate }) {
   )
 }
 
+// ─── SwipeableCard ───────────────────────────────────────────────────────────
+
+function SwipeableCard({
+  onDelete,
+  onTap,
+  children,
+}: {
+  onDelete: () => void
+  onTap: () => void
+  children: React.ReactNode
+}) {
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [offset, setOffset] = useState(0)
+  const [open, setOpen] = useState(false)
+  const [animating, setAnimating] = useState(false)
+  const isDraggingRef = useRef(false)
+  const touchData = useRef({ startX: 0, startY: 0, isH: null as boolean | null })
+  const DELETE_W = 80
+
+  useEffect(() => {
+    const card = cardRef.current
+    if (!card) return
+
+    const onStart = (e: TouchEvent) => {
+      touchData.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY, isH: null }
+      isDraggingRef.current = false
+    }
+
+    const onMove = (e: TouchEvent) => {
+      const dx = e.touches[0].clientX - touchData.current.startX
+      const dy = e.touches[0].clientY - touchData.current.startY
+      if (touchData.current.isH === null) {
+        if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+          touchData.current.isH = true
+          isDraggingRef.current = true
+          setAnimating(false)
+        } else if (Math.abs(dy) > 8) {
+          touchData.current.isH = false
+        }
+      }
+      if (!touchData.current.isH) return
+      e.preventDefault()
+      const base = open ? -DELETE_W : 0
+      setOffset(Math.max(-DELETE_W, Math.min(0, base + dx)))
+    }
+
+    const onEnd = (e: TouchEvent) => {
+      if (!touchData.current.isH) return
+      const dx = e.changedTouches[0].clientX - touchData.current.startX
+      const base = open ? -DELETE_W : 0
+      const shouldOpen = base + dx < -DELETE_W / 2
+      setOpen(shouldOpen)
+      setOffset(shouldOpen ? -DELETE_W : 0)
+      setAnimating(true)
+      setTimeout(() => { isDraggingRef.current = false }, 50)
+    }
+
+    card.addEventListener('touchstart', onStart, { passive: true })
+    card.addEventListener('touchmove', onMove, { passive: false })
+    card.addEventListener('touchend', onEnd, { passive: true })
+    return () => {
+      card.removeEventListener('touchstart', onStart)
+      card.removeEventListener('touchmove', onMove)
+      card.removeEventListener('touchend', onEnd)
+    }
+  }, [open])
+
+  const handleClick = () => {
+    if (isDraggingRef.current) return
+    if (open) { setOpen(false); setOffset(0); setAnimating(true) }
+    else onTap()
+  }
+
+  return (
+    <div className="relative rounded-2xl overflow-hidden">
+      <div className="absolute inset-y-0 right-0 w-20 bg-red-500 flex items-center justify-center rounded-2xl">
+        <button
+          onClick={e => { e.stopPropagation(); setOpen(false); setOffset(0); setAnimating(true); onDelete() }}
+          className="flex flex-col items-center gap-1 text-white px-2"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+            <path d="M10 11v6M14 11v6" />
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+          </svg>
+          <span className="text-xs font-semibold">Delete</span>
+        </button>
+      </div>
+      <div
+        ref={cardRef}
+        onClick={handleClick}
+        style={{
+          transform: `translateX(${offset}px)`,
+          transition: animating ? 'transform 0.2s ease' : 'none',
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
+
 // ─── Templates Sub-tab ────────────────────────────────────────────────────────
 
 type SortKey = 'recent' | 'used' | 'az'
@@ -524,6 +627,7 @@ function TemplatesTab() {
   const navigate = useNavigate()
   const { data, isLoading } = useTemplates()
   const { isPro, limits } = useSubscription()
+  const deleteTemplate = useDeleteTemplate()
   const [sort, setSort] = useState<SortKey>(() =>
     (localStorage.getItem(SORT_STORAGE_KEY) as SortKey) || 'recent'
   )
@@ -604,27 +708,29 @@ function TemplatesTab() {
 
       <div className="flex flex-col gap-3">
         {sorted.map(t => (
-          <button
+          <SwipeableCard
             key={t.id}
-            onClick={() => navigate(`/workouts/templates/${t.id}`)}
-            className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm text-left w-full"
+            onTap={() => navigate(`/workouts/templates/${t.id}`)}
+            onDelete={() => deleteTemplate.mutate(t.id)}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-900 text-sm">{t.name}</p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {t.exercises.length} exercises
-                  {t.useCount > 0 ? ` · used ${t.useCount}×` : ''}
-                  {t.lastUsedAt
-                    ? ` · ${Math.floor((Date.now() - new Date(t.lastUsedAt).getTime()) / 86400000)} days ago`
-                    : ''}
-                </p>
+            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm text-left w-full">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-900 text-sm">{t.name}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {t.exercises.length} exercises
+                    {t.useCount > 0 ? ` · used ${t.useCount}×` : ''}
+                    {t.lastUsedAt
+                      ? ` · ${Math.floor((Date.now() - new Date(t.lastUsedAt).getTime()) / 86400000)} days ago`
+                      : ''}
+                  </p>
+                </div>
+                <span className="text-sm font-semibold text-teal-600 shrink-0 py-1 px-2">
+                  View ›
+                </span>
               </div>
-              <span className="text-sm font-semibold text-teal-600 shrink-0 py-1 px-2">
-                View ›
-              </span>
             </div>
-          </button>
+          </SwipeableCard>
         ))}
       </div>
     </div>
