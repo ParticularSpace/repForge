@@ -159,8 +159,6 @@ export default function TemplateDetailPage() {
     )
   }
 
-  const isManual = template.source === 'manual'
-
   return (
     <>
       <div className="min-h-dvh bg-gray-50 flex flex-col">
@@ -174,20 +172,18 @@ export default function TemplateDetailPage() {
               ←
             </button>
             <h1 className="font-semibold text-gray-900 flex-1 truncate">{template.name}</h1>
-            {isManual && (
-              <button
-                onClick={() => setShowConfirm(true)}
-                className="w-9 h-9 flex items-center justify-center rounded-full text-gray-400 hover:bg-red-50 hover:text-red-400 text-lg"
-                aria-label="Delete routine"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="3 6 5 6 21 6" />
-                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                  <path d="M10 11v6M14 11v6" />
-                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                </svg>
-              </button>
-            )}
+            <button
+              onClick={() => setShowConfirm(true)}
+              className="w-9 h-9 flex items-center justify-center rounded-full text-gray-400 hover:bg-red-50 hover:text-red-400 text-lg"
+              aria-label="Delete routine"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6M14 11v6" />
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -202,11 +198,9 @@ export default function TemplateDetailPage() {
                 : ''}
             </p>
 
-            {isManual && (
-              <p className="text-xs text-gray-400 bg-gray-50 rounded-xl px-3 py-2 mb-4">
-                Tap the cog to edit weights and reps. To change exercises, use "Edit routine."
-              </p>
-            )}
+            <p className="text-xs text-gray-400 bg-gray-50 rounded-xl px-3 py-2 mb-4">
+              Tap the cog to edit weights and reps. To change exercises, use "Edit routine."
+            </p>
 
             <div className="flex flex-col gap-3">
               {template.exercises.map((ex: TemplateExercise) => (
@@ -218,18 +212,16 @@ export default function TemplateDetailPage() {
                       {ex.restSeconds ? ` · ${ex.restSeconds}s rest` : ''}
                     </p>
                   </div>
-                  {isManual && (
-                    <button
-                      onClick={() => setEditTarget(ex)}
-                      className="text-gray-300 hover:text-teal-500 shrink-0 flex items-center justify-center min-w-[44px] min-h-[44px]"
-                      aria-label={`Edit ${ex.name}`}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="8" cy="8" r="2.5"/>
-                        <path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7"/>
-                      </svg>
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setEditTarget(ex)}
+                    className="text-gray-300 hover:text-teal-500 shrink-0 flex items-center justify-center min-w-[44px] min-h-[44px]"
+                    aria-label={`Edit ${ex.name}`}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="8" cy="8" r="2.5"/>
+                      <path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7"/>
+                    </svg>
+                  </button>
                 </div>
               ))}
             </div>
@@ -239,18 +231,16 @@ export default function TemplateDetailPage() {
         {/* Bottom action bar */}
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 pb-safe-bar px-4 pt-3">
           <div className="flex gap-3 max-w-lg mx-auto">
-            {isManual && (
-              <button
-                onClick={handleEditRoutine}
-                className="flex-1 border border-gray-200 text-gray-600 rounded-xl py-3.5 font-medium text-sm"
-              >
-                Edit routine
-              </button>
-            )}
+            <button
+              onClick={handleEditRoutine}
+              className="flex-1 border border-gray-200 text-gray-600 rounded-xl py-3.5 font-medium text-sm"
+            >
+              Edit routine
+            </button>
             <button
               onClick={handleStart}
               disabled={isStarting}
-              className={`${isManual ? 'flex-[2]' : 'flex-1'} bg-teal-600 text-white rounded-xl py-3.5 font-semibold disabled:opacity-50 flex items-center justify-center gap-2`}
+              className="flex-[2] bg-teal-600 text-white rounded-xl py-3.5 font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {isStarting
                 ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Starting…</>
