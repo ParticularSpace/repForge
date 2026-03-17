@@ -17,7 +17,9 @@ export function useAuth() {
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       const newId = session?.user?.id ?? null
-      if (prevUserId.current !== undefined && prevUserId.current !== newId) {
+      // Only clear cache when a different user signs in (not on sign-out)
+      // On sign-out the AuthGuard redirects to login so stale cache is never shown
+      if (newId !== null && prevUserId.current !== undefined && prevUserId.current !== newId) {
         queryClient.clear()
       }
       prevUserId.current = newId
