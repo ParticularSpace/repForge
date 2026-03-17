@@ -109,7 +109,7 @@ function GenerateTab({ isPro }: { isPro: boolean }) {
           {generate.isPending ? (
             <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Generating…</>
           ) : (
-            `Generate ${typeLabel} workout`
+            `Generate a ${typeLabel} workout`
           )}
         </button>
 
@@ -518,7 +518,7 @@ function TemplatesTab() {
         <div>
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
-              My routines{!isPro && templateLimit !== null ? ` (${manual.length}/${templateLimit})` : ''}
+              Your routines{!isPro && templateLimit !== null ? ` (${manual.length}/${templateLimit})` : ''}
             </p>
             {!isPro && templateLimit !== null && manual.length >= templateLimit && (
               <Link to="/upgrade?reason=template_limit" className="text-xs font-semibold text-teal-600 hover:underline">
@@ -557,7 +557,7 @@ function TemplatesTab() {
 
       {ai.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">AI generated</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">AI workouts</p>
           <div className="flex flex-col gap-3">
             {ai.map(t => (
               <button
@@ -632,7 +632,7 @@ export default function WorkoutsPage() {
               tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            {t.charAt(0).toUpperCase() + t.slice(1)}
+            {t === 'templates' ? 'Routines' : t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>

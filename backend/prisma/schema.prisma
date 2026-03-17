@@ -27,8 +27,11 @@ model User {
   proGrantedByAdmin    Boolean   @default(false) @map("pro_granted_by_admin")
   subscriptionEndsAt   DateTime? @map("subscription_ends_at")
   onboardingCompleted  Boolean   @default(false) @map("onboarding_completed")
+  weeklyGoal           Int       @default(3) @map("weekly_goal")
+  pinnedTemplateId     String?   @map("pinned_template_id")
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt      @map("updated_at")
+  weeklyGoalResults    WeeklyGoalResult[]
   @@map("users")
 }
 
@@ -99,6 +102,20 @@ model WorkoutTemplate {
   exercises  TemplateExercise[]
   @@unique([userId, name, source])
   @@map("workout_templates")
+}
+
+model WeeklyGoalResult {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekStart DateTime @map("week_start")
+  goal      Int
+  completed Int      @default(0)
+  met       Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, weekStart])
+  @@map("weekly_goal_results")
 }
 
 model WeightLog {

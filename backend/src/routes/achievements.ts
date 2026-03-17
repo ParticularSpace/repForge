@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { authenticate } from '../middleware/auth'
 import { prisma } from '../lib/prisma'
+import { getBestWeeklyStreak, syncWeeklyGoals } from '../lib/weeklyGoals'
 
 interface TierDef {
   id: string
@@ -20,7 +21,7 @@ interface ChainDef {
 interface AchievementData {
   totalWorkouts: number
   totalSets: number
-  longestStreak: number
+  bestWeeklyStreak: number
   totalWeightLifted: number
   uniquePrCount: number
 }
@@ -29,13 +30,13 @@ const CHAINS: ChainDef[] = [
   {
     id: 'streak',
     name: 'Streak',
-    getValue: d => d.longestStreak,
+    getValue: d => d.bestWeeklyStreak,
     tiers: [
-      { id: 'streak_1', name: 'First fire',   description: 'Reach a 3-day streak',  icon: '🔥', threshold: 3  },
-      { id: 'streak_2', name: 'On a roll',    description: 'Reach a 7-day streak',  icon: '🔥', threshold: 7  },
-      { id: 'streak_3', name: 'Iron will',    description: 'Reach a 14-day streak', icon: '💪', threshold: 14 },
-      { id: 'streak_4', name: 'Unstoppable',  description: 'Reach a 21-day streak', icon: '⚡', threshold: 21 },
-      { id: 'streak_5', name: 'Streak king',  description: 'Reach a 30-day streak', icon: '👑', threshold: 30 },
+      { id: 'streak_1', name: 'First fire',     description: 'Complete 1 successful week',           icon: '🔥',  threshold: 1  },
+      { id: 'streak_2', name: 'Heating up',     description: 'Hit your weekly goal 3 weeks in a row', icon: '🔥🔥', threshold: 3  },
+      { id: 'streak_3', name: 'On fire',        description: 'Hit your weekly goal 5 weeks in a row', icon: '🔥🔥🔥', threshold: 5 },
+      { id: 'streak_4', name: 'Unstoppable',    description: 'Hit your weekly goal 10 weeks in a row', icon: '⚡', threshold: 10 },
+      { id: 'streak_5', name: 'Streak legend',  description: 'Hit your weekly goal 20 weeks in a row', icon: '👑', threshold: 20 },
     ],
   },
   {
@@ -98,7 +99,17 @@ export async function achievementRoutes(app: FastifyInstance) {
   app.get('/profile/achievements', { preHandler: [authenticate] }, async (request) => {
     const userId = request.user.id
 
-    const [workouts, setLogs] = await Promise.all([
+    // Get user's weekly goal for sync
+    const userRecord = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { weeklyGoal: true },
+    })
+    const goal = userRecord?.weeklyGoal ?? 3
+
+    // Sync weekly goals before computing streak
+    await syncWeeklyGoals(userId, goal, prisma)
+
+    const [workouts, setLogs, bestWeeklyStreak] = await Promise.all([
       prisma.workout.findMany({
         where: { userId, completedAt: { not: null } },
         select: { id: true, startedAt: true, completedAt: true, durationMin: true },
@@ -108,33 +119,8 @@ export async function achievementRoutes(app: FastifyInstance) {
         where: { exercise: { workout: { userId } } },
         select: { actualWeight: true, actualReps: true, exercise: { select: { name: true } } },
       }),
+      getBestWeeklyStreak(userId, prisma),
     ])
-
-    const DAY = 86400000
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    const uniqueDays = [...new Set(
-      workouts.map(w => {
-        const d = new Date(w.startedAt)
-        d.setHours(0, 0, 0, 0)
-        return d.getTime()
-      })
-    )].sort((a, b) => b - a)
-
-    // Longest streak
-    let longestStreak = 0
-    let currentRun = 0
-    let prevDay: number | null = null
-    for (const day of [...uniqueDays].sort((a, b) => a - b)) {
-      if (prevDay === null || day - prevDay <= DAY) {
-        currentRun++
-        longestStreak = Math.max(longestStreak, currentRun)
-      } else {
-        currentRun = 1
-      }
-      prevDay = day
-    }
 
     // Total weight lifted
     const totalWeightLifted = setLogs.reduce((sum, s) => {
@@ -156,8 +142,8 @@ export async function achievementRoutes(app: FastifyInstance) {
       else if (dur > 30) totalXp += 25
     }
     totalXp += setLogs.length * 2
-    if (longestStreak >= 7) totalXp += 100
-    else if (longestStreak >= 3) totalXp += 30
+    if (bestWeeklyStreak >= 10) totalXp += 100
+    else if (bestWeeklyStreak >= 3) totalXp += 30
 
     // Determine level
     let levelData = LEVELS[0]
@@ -173,7 +159,7 @@ export async function achievementRoutes(app: FastifyInstance) {
     const data: AchievementData = {
       totalWorkouts: workouts.length,
       totalSets: setLogs.length,
-      longestStreak,
+      bestWeeklyStreak,
       totalWeightLifted: Math.round(totalWeightLifted),
       uniquePrCount,
     }

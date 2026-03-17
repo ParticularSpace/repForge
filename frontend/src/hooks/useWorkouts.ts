@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import type { Workout, Exercise, WorkoutPlan, WorkoutType, Difficulty, PersonalInfo, ProfileStats, AchievementsResponse, UserProfile } from '@/types'
+import type { Workout, Exercise, WorkoutPlan, WorkoutType, Difficulty, PersonalInfo, ProfileStats, AchievementsResponse, UserProfile, HomeData } from '@/types'
 
 export function useProfile() {
   return useQuery({
@@ -70,7 +70,35 @@ export function useCompleteWorkout() {
       qc.invalidateQueries({ queryKey: ['achievements'] })
       qc.invalidateQueries({ queryKey: ['workouts'] })
       qc.invalidateQueries({ queryKey: ['workouts', id] })
+      qc.invalidateQueries({ queryKey: ['home'] })
     },
+  })
+}
+
+export function useHomeData() {
+  return useQuery({
+    queryKey: ['home'],
+    queryFn: () => api.get<HomeData>('/api/v1/home'),
+    staleTime: 0,
+  })
+}
+
+export function usePinTemplate() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (templateId: string | null) =>
+      api.patch<{ success: boolean }>('/api/v1/home/pin', { templateId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['home'] })
+    },
+  })
+}
+
+export function useTopTemplates() {
+  return useQuery({
+    queryKey: ['home-top-templates'],
+    queryFn: () => api.get<Array<{ id: string; name: string; exerciseCount: number; useCount: number; lastUsedAt: string | null; exercises: string[] }>>('/api/v1/home/top-templates'),
+    staleTime: 30000,
   })
 }
 

@@ -107,6 +107,7 @@ interface EditState {
   fitnessGoal: string
   experienceNotes: string
   preferredRestSeconds: string
+  weeklyGoal: number
 }
 
 function profileToEdit(p: UserProfile): EditState {
@@ -121,6 +122,7 @@ function profileToEdit(p: UserProfile): EditState {
     fitnessGoal: p.fitnessGoal ?? '',
     experienceNotes: p.experienceNotes ?? '',
     preferredRestSeconds: p.preferredRestSeconds != null ? String(p.preferredRestSeconds) : '60',
+    weeklyGoal: p.weeklyGoal ?? 3,
   }
 }
 
@@ -138,6 +140,7 @@ function editToProfile(e: EditState): Partial<UserProfile> {
     fitnessGoal: e.fitnessGoal || null,
     experienceNotes: e.experienceNotes.trim() || null,
     preferredRestSeconds: e.preferredRestSeconds ? parseInt(e.preferredRestSeconds) : 60,
+    weeklyGoal: e.weeklyGoal,
   }
 }
 
@@ -303,12 +306,29 @@ export default function ProfilePage() {
       {/* 4-card stat grid */}
       {stats && (
         <div className="mb-5">
-          <div className="grid grid-cols-2 gap-3 mb-2">
+          <div className="grid grid-cols-2 gap-3 mb-3">
             <StatCard value={stats.totalWorkouts} label="Total workouts" />
-            <StatCard value={stats.longestStreak > 0 ? `${stats.longestStreak} days` : '—'} label="Best streak" />
+            <StatCard value={stats.bestWeeklyStreak > 0 ? `${stats.bestWeeklyStreak} weeks` : '—'} label="Best streak" />
             <StatCard value={stats.totalSets} label="Total sets" />
-            <StatCard value={stats.currentStreak > 0 ? `${stats.currentStreak} days` : '—'} label="Current streak" />
+            <StatCard value={stats.currentWeeklyStreak > 0 ? `${stats.currentWeeklyStreak} weeks` : '—'} label="Weekly streak" />
           </div>
+
+          {/* Weekly progress bar */}
+          <div className="bg-gray-50 rounded-xl p-3 mb-2">
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-400 shrink-0">This week</span>
+              <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-teal-500 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, Math.round((stats.thisWeekCompleted / stats.weeklyGoal) * 100))}%` }}
+                />
+              </div>
+              <span className="text-xs font-medium text-gray-700 shrink-0">
+                {stats.thisWeekCompleted} / {stats.weeklyGoal}
+              </span>
+            </div>
+          </div>
+
           <Link to="/stats" className="text-sm font-semibold text-teal-600 hover:underline block text-right">
             View full stats →
           </Link>
@@ -465,6 +485,10 @@ export default function ProfilePage() {
                 <span className="font-medium text-gray-900">{profile.preferredRestSeconds}s</span>
               </div>
             )}
+            <div className="flex justify-between">
+              <span className="text-gray-400">Weekly goal</span>
+              <span className="font-medium text-gray-900">{profile.weeklyGoal ?? 3} workouts/week</span>
+            </div>
             {!profile.displayName && !profile.age && !profile.heightIn && !profile.weightLbs && (
               <p className="text-sm text-gray-400">Add your details to personalise workouts</p>
             )}
@@ -565,6 +589,27 @@ export default function ProfilePage() {
                 placeholder="60"
                 className="w-full border border-gray-200 rounded-xl px-3 py-2 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
+            </div>
+
+            <div>
+              <label className="block text-xs text-gray-400 mb-2">Weekly workout goal</label>
+              <div className="flex gap-2">
+                {[2, 3, 4, 5].map(n => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setEditState(prev => prev ? { ...prev, weeklyGoal: n } : prev)}
+                    className={`flex-1 rounded-xl py-2.5 text-sm font-semibold border transition-colors ${
+                      editState.weeklyGoal === n
+                        ? 'bg-teal-600 text-white border-teal-600'
+                        : 'bg-white text-gray-600 border-gray-200'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">workouts per week</p>
             </div>
 
             {/* Save / Cancel — bottom of form */}

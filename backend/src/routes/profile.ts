@@ -5,6 +5,12 @@ import { isPro } from '../lib/userPlan'
 import { isAdmin } from '../lib/admin'
 import { getWeekStart } from '../lib/dateUtils'
 import { profileUpdateSchema } from '../lib/validation'
+import {
+  getCurrentWeekProgress,
+  getWeeklyStreak,
+  getBestWeeklyStreak,
+  syncWeeklyGoals,
+} from '../lib/weeklyGoals'
 
 interface UserProfileUpdate {
   displayName?: string | null
@@ -17,6 +23,7 @@ interface UserProfileUpdate {
   preferredRestSeconds?: number | null
   equipment?: string[]
   onboardingCompleted?: boolean
+  weeklyGoal?: number
 }
 
 export async function profileRoutes(app: FastifyInstance) {
@@ -42,6 +49,7 @@ export async function profileRoutes(app: FastifyInstance) {
           proGrantedByAdmin: true,
           subscriptionEndsAt: true,
           onboardingCompleted: true,
+          weeklyGoal: true,
         },
       }),
       prisma.workout.count({
@@ -77,6 +85,7 @@ export async function profileRoutes(app: FastifyInstance) {
         savedTemplates: pro ? -1 : 3,
       },
       onboardingCompleted: user?.onboardingCompleted ?? false,
+      weeklyGoal: user?.weeklyGoal ?? 3,
     }
   })
 
@@ -98,6 +107,7 @@ export async function profileRoutes(app: FastifyInstance) {
     if ('preferredRestSeconds' in body) data.preferredRestSeconds = body.preferredRestSeconds
     if ('equipment' in body)            data.equipmentPreferences = body.equipment
     if ('onboardingCompleted' in body)  data.onboardingCompleted = body.onboardingCompleted
+    if ('weeklyGoal' in body)           data.weeklyGoal = body.weeklyGoal
 
     await prisma.user.upsert({
       where: { id: userId },
@@ -130,8 +140,17 @@ export async function profileRoutes(app: FastifyInstance) {
   app.get('/profile/stats', { preHandler: [authenticate] }, async (request) => {
     const userId = request.user.id
 
-    const [workouts, setCount, setLogs, recentWorkouts, workoutsThisWeek] = await Promise.all([
-      // All completed workouts (for streak + total count + avg duration)
+    const userRecord = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { weeklyGoal: true },
+    })
+    const goal = userRecord?.weeklyGoal ?? 3
+
+    // Sync past weeks before computing streaks
+    await syncWeeklyGoals(userId, goal, prisma)
+
+    const [workouts, setCount, setLogs, recentWorkouts, workoutsThisWeek, weeklyStreak, bestWeeklyStreak, weeklyProgress] = await Promise.all([
+      // All completed workouts (for total count + avg duration + PRs)
       prisma.workout.findMany({
         where: { userId, completedAt: { not: null } },
         select: { completedAt: true, startedAt: true, durationMin: true },
@@ -163,46 +182,10 @@ export async function profileRoutes(app: FastifyInstance) {
       prisma.workout.count({
         where: { userId, startedAt: { gte: getWeekStart() } },
       }),
+      getWeeklyStreak(userId, prisma),
+      getBestWeeklyStreak(userId, prisma),
+      getCurrentWeekProgress(userId, goal, prisma),
     ])
-
-    const DAY = 86400000
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    // Use startedAt for streak date calculation (handles workout spanning midnight)
-    const uniqueDays = [...new Set(
-      workouts.map(w => {
-        const d = new Date(w.startedAt)
-        d.setHours(0, 0, 0, 0)
-        return d.getTime()
-      })
-    )].sort((a, b) => b - a)
-
-    // Current streak
-    let streak = 0
-    let cursor = today.getTime()
-    for (const day of uniqueDays) {
-      if (day === cursor || day === cursor - DAY) {
-        streak++
-        cursor = day
-      } else {
-        break
-      }
-    }
-
-    // Longest streak (all-time best)
-    let longestStreak = 0
-    let currentRun = 0
-    let prevDay: number | null = null
-    for (const day of [...uniqueDays].sort((a, b) => a - b)) {
-      if (prevDay === null || day - prevDay <= DAY) {
-        currentRun++
-        longestStreak = Math.max(longestStreak, currentRun)
-      } else {
-        currentRun = 1
-      }
-      prevDay = day
-    }
 
     // Average workout duration
     const workoutsWithDuration = workouts.filter(w => w.durationMin != null)
@@ -217,8 +200,7 @@ export async function profileRoutes(app: FastifyInstance) {
     }, 0)
 
     // Personal records: heaviest weight per exercise
-    // For each PR, also compute how many total workouts have been completed since that set was logged
-    const totalWorkouts = workouts.length
+    const totalWorkoutsCount = workouts.length
     const prMap: Record<string, { weightLbs: number; reps: number; date: string }> = {}
     for (const s of setLogs) {
       if (!s.actualWeight || !s.actualReps) continue
@@ -239,13 +221,17 @@ export async function profileRoutes(app: FastifyInstance) {
       .slice(0, 5)
 
     return {
-      totalWorkouts,
+      totalWorkouts: totalWorkoutsCount,
       totalSets: setCount,
-      currentStreak: streak,
-      longestStreak,
       totalWeightLifted: Math.round(totalWeightLifted),
       avgDurationMin,
       workoutsThisWeek,
+      weeklyGoal: goal,
+      thisWeekCompleted: weeklyProgress.completed,
+      thisWeekRemaining: weeklyProgress.remaining,
+      thisWeekMet: weeklyProgress.met,
+      currentWeeklyStreak: weeklyStreak,
+      bestWeeklyStreak,
       personalRecords,
       recentWorkouts: recentWorkouts.map(w => ({
         id: w.id,

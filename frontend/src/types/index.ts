@@ -18,6 +18,7 @@ export interface UserProfile {
   experienceNotes: string | null
   preferredRestSeconds: number
   equipment: string[]
+  weeklyGoal: number
   // Subscription
   subscriptionStatus: 'free' | 'pro' | 'past_due' | 'cancelled'
   isPro: boolean
@@ -96,11 +97,15 @@ export interface Exercise {
 export interface ProfileStats {
   totalWorkouts: number
   totalSets: number
-  currentStreak: number
-  longestStreak: number
   totalWeightLifted: number
   avgDurationMin: number | null
   workoutsThisWeek: number
+  weeklyGoal: number
+  thisWeekCompleted: number
+  thisWeekRemaining: number
+  thisWeekMet: boolean
+  currentWeeklyStreak: number
+  bestWeeklyStreak: number
   personalRecords: Array<{
     exerciseName: string
     weightLbs: number
@@ -115,6 +120,34 @@ export interface ProfileStats {
     completedAt: string
     durationMin: number | null
     exerciseCount: number
+  }>
+}
+
+export interface HeroTemplate {
+  id: string
+  name: string
+  exerciseCount: number
+  useCount: number
+  lastUsedAt: string | null
+  daysSinceLastUse: number | null
+  exercises: string[]
+}
+
+export interface HomeData {
+  heroTemplate: HeroTemplate | null
+  weeklyProgress: {
+    completed: number
+    goal: number
+    remaining: number
+    met: boolean
+    currentWeeklyStreak: number
+  }
+  recentWorkouts: Array<{
+    id: string
+    name: string
+    completedAt: string | null
+    exerciseCount: number
+    durationMin: number | null
   }>
 }
 
