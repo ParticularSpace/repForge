@@ -93,3 +93,14 @@ export function useStartTemplate() {
     },
   })
 }
+
+export function useAppendTemplateExercise(templateId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (exercise: { name: string; sets: number; reps: number; weightLbs?: number; restSeconds?: number }) =>
+      api.post<WorkoutTemplate>(`/api/v1/templates/${templateId}/exercises/append`, exercise),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['templates'] })
+    },
+  })
+}

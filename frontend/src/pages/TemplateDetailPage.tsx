@@ -1,28 +1,82 @@
-import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useProfile } from '@/hooks/useWorkouts'
-import { useTemplates, useUpdateTemplateExercises, useDeleteTemplate, useStartTemplate } from '@/hooks/useTemplates'
+import { useTemplates, useUpdateTemplateExercises, useDeleteTemplate, useStartTemplate, useAppendTemplateExercise } from '@/hooks/useTemplates'
 import EditExerciseModal from '@/components/workout/EditExerciseModal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import Toast from '@/components/ui/Toast'
 import { formatWeight } from '@/lib/formatWeight'
 import type { ExercisePlan, TemplateExercise } from '@/types'
 
+interface CoachAction {
+  type: string
+  exerciseName: string | null
+  suggestedSets: number | null
+  suggestedReps: number | null
+  suggestedWeightLbs: number | null
+}
+
 export default function TemplateDetailPage() {
   const { templateId } = useParams<{ templateId: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const { data: profile } = useProfile()
   const { data: templatesData } = useTemplates()
   const updateExercises = useUpdateTemplateExercises(templateId!)
   const deleteTemplate = useDeleteTemplate()
   const startTemplate = useStartTemplate()
+  const appendExercise = useAppendTemplateExercise(templateId!)
 
   const [editTarget, setEditTarget] = useState<TemplateExercise | null>(null)
   const [showConfirm, setShowConfirm] = useState(false)
   const [toast, setToast] = useState(false)
+  const [toastMessage, setToastMessage] = useState('Saved!')
   const [isStarting, setIsStarting] = useState(false)
+  const coachActionProcessed = useRef(false)
 
   const template = [...(templatesData?.manual ?? []), ...(templatesData?.ai ?? [])].find(t => t.id === templateId)
+
+  // Process coaching action from navigation state once template is loaded
+  useEffect(() => {
+    if (!template || coachActionProcessed.current) return
+    const coachAction = (location.state as { coachAction?: CoachAction } | null)?.coachAction
+    if (!coachAction) return
+    coachActionProcessed.current = true
+
+    const { type, exerciseName, suggestedSets, suggestedReps, suggestedWeightLbs } = coachAction
+
+    if (type === 'add_exercise' && exerciseName) {
+      // Auto-append the suggested exercise to the template
+      appendExercise.mutate(
+        {
+          name: exerciseName,
+          sets: suggestedSets ?? 3,
+          reps: suggestedReps ?? 10,
+          weightLbs: suggestedWeightLbs ?? undefined,
+        },
+        {
+          onSuccess: () => {
+            setToastMessage(`${exerciseName} added to your routine!`)
+            setToast(true)
+          },
+        }
+      )
+    } else if ((type === 'add_set' || type === 'increase_weight' || type === 'reduce_volume') && exerciseName) {
+      // Find matching exercise and open edit modal with suggested values pre-filled
+      const match = template.exercises.find(e => e.name.toLowerCase() === exerciseName.toLowerCase())
+      if (match) {
+        const overridden: TemplateExercise = {
+          ...match,
+          ...(suggestedSets !== null ? { sets: suggestedSets } : {}),
+          ...(suggestedReps !== null ? { reps: suggestedReps } : {}),
+          ...(suggestedWeightLbs !== null ? { weightLbs: suggestedWeightLbs } : {}),
+        }
+        setEditTarget(overridden)
+      }
+    }
+    // Clear state from history so back-navigation doesn't re-trigger
+    navigate(location.pathname, { replace: true, state: {} })
+  }, [template]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSaveExercise = async (updated: ExercisePlan) => {
     if (!editTarget) return
@@ -34,6 +88,7 @@ export default function TemplateDetailPage() {
       restSeconds: updated.restSeconds,
     }])
     setEditTarget(null)
+    setToastMessage('Saved!')
     setToast(true)
   }
 
@@ -192,7 +247,7 @@ export default function TemplateDetailPage() {
         />
       )}
 
-      {toast && <Toast message="Saved!" onDone={() => setToast(false)} />}
+      {toast && <Toast message={toastMessage} onDone={() => setToast(false)} />}
     </>
   )
 }

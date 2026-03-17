@@ -322,6 +322,52 @@ export async function templateRoutes(fastify: FastifyInstance) {
     return reply.code(204).send()
   })
 
+  // POST /templates/:id/exercises/append — add a new exercise to the end of a template
+  fastify.post('/templates/:id/exercises/append', { preHandler: authenticate }, async (request, reply) => {
+    const userId = (request as any).user.id
+    const { id } = request.params as { id: string }
+    const body = request.body as {
+      name: string
+      sets: number
+      reps: number
+      weightLbs?: number
+      restSeconds?: number
+    }
+
+    if (!body.name?.trim()) return reply.code(400).send({ error: 'name is required' })
+
+    const template = await prisma.workoutTemplate.findUnique({
+      where: { id },
+      include: { exercises: { orderBy: { order: 'asc' } } },
+    })
+    if (!template) return reply.code(404).send({ error: 'Template not found' })
+    if (template.userId !== userId) return reply.code(403).send({ error: 'Forbidden' })
+
+    const nextOrder = template.exercises.length > 0
+      ? Math.max(...template.exercises.map(e => e.order)) + 1
+      : 1
+
+    await prisma.templateExercise.create({
+      data: {
+        templateId: id,
+        name: body.name.trim(),
+        order: nextOrder,
+        sets: body.sets,
+        reps: body.reps,
+        weightLbs: body.weightLbs ?? null,
+        restSeconds: body.restSeconds ?? null,
+        muscleGroups: [],
+      },
+    })
+
+    const updated = await prisma.workoutTemplate.findUnique({
+      where: { id },
+      include: { exercises: { orderBy: { order: 'asc' } } },
+    })
+
+    return mapTemplate(updated!)
+  })
+
   // POST /templates/:id/start — create workout from template
   fastify.post('/templates/:id/start', { preHandler: authenticate }, async (request, reply) => {
     const userId = (request as any).user.id

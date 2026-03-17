@@ -263,17 +263,24 @@ export default function HomePage() {
   const hasHero = !isLoading && homeData?.heroTemplate != null
 
   const handleCoachAction = (actionType: string) => {
+    const ci = homeData?.coachingInsight
+    const coachAction = {
+      type: actionType,
+      exerciseName: ci?.exerciseName ?? null,
+      suggestedSets: ci?.suggestedSets ?? null,
+      suggestedReps: ci?.suggestedReps ?? null,
+      suggestedWeightLbs: ci?.suggestedWeightLbs ?? null,
+    }
     switch (actionType) {
       case 'add_set':
       case 'increase_weight':
       case 'reduce_volume':
-        if (homeData?.heroTemplate) navigate(`/workouts/templates/${homeData.heroTemplate.id}`)
-        break
       case 'add_exercise':
-        navigate('/workouts', { state: { activeTab: 'build' } })
+        if (homeData?.heroTemplate) {
+          navigate(`/workouts/templates/${homeData.heroTemplate.id}`, { state: { coachAction } })
+        }
         break
       case 'rest':
-        // dismiss — just navigate nowhere, insight disappears on next load
         break
     }
   }

@@ -9,6 +9,10 @@ export interface CoachingInsight {
   insight: string
   action: string | null
   actionType: string | null
+  exerciseName: string | null
+  suggestedSets: number | null
+  suggestedReps: number | null
+  suggestedWeightLbs: number | null
 }
 
 function sanitize(s: string): string {
@@ -161,15 +165,19 @@ Muscle group volume (sets last 4 weeks vs prior 4 weeks):
 ${volumeLines.length > 0 ? volumeLines.join('\n') : 'Insufficient history'}
 
 Return ONLY a JSON object with this exact shape:
-{"insight":"One sentence observation about their progress or a specific recommendation. Max 20 words. Be specific, not generic.","action":"Optional short action label if there is a clear next step. Max 6 words. null if no action.","actionType":"add_set | increase_weight | add_exercise | rest | reduce_volume | null"}
+{"insight":"One sentence observation. Max 20 words. Be specific, not generic.","action":"Short action label, max 6 words. null if no action.","actionType":"add_set | increase_weight | add_exercise | rest | reduce_volume | null","exerciseName":"Exact exercise name from the data if action targets a specific exercise, else null","suggestedSets":"Number of sets to do if actionType is add_set or add_exercise, else null","suggestedReps":"Number of reps if actionType is add_set or add_exercise, else null","suggestedWeightLbs":"Suggested weight in lbs based on their history if actionType is add_set, increase_weight, or add_exercise, else null"}
 
 Rules:
 - Reference specific exercises or numbers from the data, not generic advice
-- If the user has not worked out in 5+ days: comment on returning to their routine
-- If a weight has increased 3+ sessions in a row: suggest adding a set
-- If one muscle group volume is significantly lower than others: flag the imbalance
-- If this week's goal is already met: acknowledge it positively
-- If weekly streak >= 5: acknowledge their consistency
+- exerciseName must exactly match an exercise name from the data (or be a specific exercise name for add_exercise)
+- suggestedWeightLbs: for increase_weight, use their last logged weight + 5 lbs; for add_set/add_exercise, use their most recent weight for that exercise or a reasonable starting weight
+- suggestedSets: for add_set, use current sets + 1; for add_exercise, use 3
+- suggestedReps: for add_set, use their current reps; for add_exercise, use 10-12
+- If the user has not worked out in 5+ days: comment on returning to their routine (actionType: rest, no exercise fields)
+- If a weight has increased 3+ sessions in a row: suggest adding a set (actionType: add_set)
+- If one muscle group volume is significantly lower than others: suggest an exercise to add (actionType: add_exercise)
+- If this week's goal is already met: acknowledge it (no action needed, actionType: null)
+- If weekly streak >= 5: acknowledge their consistency (actionType: null)
 - Never say "great job" or generic praise
 - Return only the JSON, no other text`
 

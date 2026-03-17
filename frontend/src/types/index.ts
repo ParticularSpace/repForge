@@ -153,6 +153,10 @@ export interface HomeData {
     insight: string
     action: string | null
     actionType: string | null
+    exerciseName: string | null
+    suggestedSets: number | null
+    suggestedReps: number | null
+    suggestedWeightLbs: number | null
   } | null
 }
 
