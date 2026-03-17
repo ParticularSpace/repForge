@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { useGenerateWorkout, useCreateWorkout, useProfile } from '@/hooks/useWorkouts'
 import { useSubscription } from '@/hooks/useSubscription'
-import { useTemplates, useCreateTemplate, useUpdateTemplate, useStartTemplate } from '@/hooks/useTemplates'
+import { useTemplates, useCreateTemplate, useUpdateTemplate } from '@/hooks/useTemplates'
 import { useExerciseSearch, useCreateExercise } from '@/hooks/useExerciseLibrary'
 import EditExerciseModal from '@/components/workout/EditExerciseModal'
 import Toast from '@/components/ui/Toast'
@@ -524,23 +524,10 @@ function TemplatesTab() {
   const navigate = useNavigate()
   const { data, isLoading } = useTemplates()
   const { isPro, limits } = useSubscription()
-  const startTemplate = useStartTemplate()
-  const [startingId, setStartingId] = useState<string | null>(null)
   const [sort, setSort] = useState<SortKey>(() =>
     (localStorage.getItem(SORT_STORAGE_KEY) as SortKey) || 'recent'
   )
   const [showSortMenu, setShowSortMenu] = useState(false)
-
-  const handleStart = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation()
-    setStartingId(id)
-    try {
-      const { workoutId } = await startTemplate.mutateAsync(id)
-      navigate(`/workout/${workoutId}/active`, { replace: true })
-    } finally {
-      setStartingId(null)
-    }
-  }
 
   const handleSort = (s: SortKey) => {
     setSort(s)
@@ -633,13 +620,9 @@ function TemplatesTab() {
                     : ''}
                 </p>
               </div>
-              <button
-                onClick={e => handleStart(e, t.id)}
-                disabled={startingId === t.id}
-                className="text-sm font-semibold text-teal-600 disabled:opacity-50 shrink-0 py-1 px-2"
-              >
-                {startingId === t.id ? '…' : 'Start ›'}
-              </button>
+              <span className="text-sm font-semibold text-teal-600 shrink-0 py-1 px-2">
+                View ›
+              </span>
             </div>
           </button>
         ))}

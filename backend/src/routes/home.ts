@@ -106,7 +106,7 @@ export async function homeRoutes(app: FastifyInstance) {
     const userId = request.user.id
     const templates = await prisma.workoutTemplate.findMany({
       where: { userId },
-      orderBy: [{ useCount: 'desc' }, { updatedAt: 'desc' }],
+      orderBy: [{ updatedAt: 'desc' }, { useCount: 'desc' }],
       take: 20,
       include: { exercises: { orderBy: { order: 'asc' }, take: 3 } },
     })

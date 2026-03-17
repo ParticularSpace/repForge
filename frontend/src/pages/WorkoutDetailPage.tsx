@@ -15,6 +15,7 @@ export default function WorkoutDetailPage() {
   const navigate = useNavigate()
   const { data: workout, isLoading } = useWorkout(id)
   const [startingAgain, setStartingAgain] = useState(false)
+  const [loadingEdit, setLoadingEdit] = useState(false)
 
   if (isLoading) {
     return (
@@ -28,20 +29,59 @@ export default function WorkoutDetailPage() {
 
   const exercises = workout.exercises ?? []
 
-  const handleStartAgain = async () => {
-    setStartingAgain(true)
-    try {
-      const full = await api.get<Workout>(`/api/v1/workouts/${workout.id}`)
-      const plan = {
+  const buildPlan = async () => {
+    const full = await api.get<Workout>(`/api/v1/workouts/${workout.id}`)
+    return {
+      plan: {
         name: full.name,
         exercises: (full.exercises ?? []).map(e => ({
           name: e.name, order: e.order, sets: e.sets,
           reps: e.reps, weightLbs: e.weightLbs, notes: e.notes,
         })),
-      }
-      navigate('/workout/preview', { state: { plan, type: full.type, difficulty: full.difficulty } })
+      },
+      type: full.type,
+      difficulty: full.difficulty,
+    }
+  }
+
+  const handleStartAgain = async () => {
+    setStartingAgain(true)
+    try {
+      const state = await buildPlan()
+      navigate('/workout/preview', { state })
     } finally {
       setStartingAgain(false)
+    }
+  }
+
+  const handleEdit = async () => {
+    setLoadingEdit(true)
+    try {
+      const full = await api.get<Workout>(`/api/v1/workouts/${workout.id}`)
+      const exercises = (full.exercises ?? []).map(e => ({
+        name: e.name, order: e.order, sets: e.sets,
+        reps: e.reps, weightLbs: e.weightLbs ?? 0,
+        restSeconds: undefined as number | undefined,
+        muscleGroups: (e.muscleGroups as string[] | undefined) ?? [],
+      }))
+      navigate('/workouts', {
+        state: {
+          activeTab: 'build',
+          editingTemplate: {
+            id: workout.id,
+            name: full.name,
+            type: full.type,
+            source: 'manual' as const,
+            createdAt: full.startedAt,
+            updatedAt: full.startedAt,
+            lastUsedAt: full.completedAt ?? null,
+            useCount: 0,
+            exercises,
+          },
+        },
+      })
+    } finally {
+      setLoadingEdit(false)
     }
   }
 
@@ -98,9 +138,18 @@ export default function WorkoutDetailPage() {
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 pb-safe-bar px-4 pt-3">
         <div className="flex gap-3 max-w-lg mx-auto">
           <button
+            onClick={handleEdit}
+            disabled={loadingEdit || startingAgain}
+            className="flex-1 border border-gray-200 text-gray-600 rounded-xl py-3.5 font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {loadingEdit
+              ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
+              : 'Edit'}
+          </button>
+          <button
             onClick={handleStartAgain}
-            disabled={startingAgain}
-            className="flex-1 bg-teal-600 text-white rounded-xl py-3.5 font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+            disabled={startingAgain || loadingEdit}
+            className="flex-[2] bg-teal-600 text-white rounded-xl py-3.5 font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {startingAgain
               ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Loading…</>
