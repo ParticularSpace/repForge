@@ -64,7 +64,7 @@ export default function ProGate({ title, description, height = 200, variant = 'l
         {variant === 'line-wave' && <FakeLineWave />}
         {variant === 'cards' && <FakeCards />}
       </div>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.45)' }}
+      <div style={{ position: 'absolute', inset: 0, background: 'color-mix(in srgb, var(--bg-primary) 60%, transparent)' }}
         className="flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl border border-gray-200 p-5 text-center max-w-xs shadow-lg w-full">
           <p className="font-semibold text-gray-900 mb-1">{title}</p>

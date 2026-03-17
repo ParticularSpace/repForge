@@ -475,12 +475,25 @@ function BuildTab({ editingTemplate }: { editingTemplate?: WorkoutTemplate }) {
 
 // ─── Templates Sub-tab ────────────────────────────────────────────────────────
 
+type SortKey = 'recent' | 'used' | 'az'
+const SORT_STORAGE_KEY = 'routines_sort'
+
+const SORT_LABELS: Record<SortKey, string> = {
+  recent: 'Most recent',
+  used:   'Most used',
+  az:     'A–Z',
+}
+
 function TemplatesTab() {
   const navigate = useNavigate()
   const { data, isLoading } = useTemplates()
   const { isPro, limits } = useSubscription()
   const startTemplate = useStartTemplate()
   const [startingId, setStartingId] = useState<string | null>(null)
+  const [sort, setSort] = useState<SortKey>(() =>
+    (localStorage.getItem(SORT_STORAGE_KEY) as SortKey) || 'recent'
+  )
+  const [showSortMenu, setShowSortMenu] = useState(false)
 
   const handleStart = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
@@ -493,14 +506,29 @@ function TemplatesTab() {
     }
   }
 
+  const handleSort = (s: SortKey) => {
+    setSort(s)
+    localStorage.setItem(SORT_STORAGE_KEY, s)
+    setShowSortMenu(false)
+  }
+
   if (isLoading) {
     return <div className="flex justify-center py-10"><span className="h-6 w-6 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" /></div>
   }
 
-  const manual = data?.manual ?? []
-  const ai = data?.ai ?? []
-  const isEmpty = manual.length === 0 && ai.length === 0
+  const all = [...(data?.manual ?? []), ...(data?.ai ?? [])]
+  const isEmpty = all.length === 0
   const templateLimit = limits.savedTemplates === -1 ? null : limits.savedTemplates
+  const manualCount = data?.manual.length ?? 0
+
+  const sorted = [...all].sort((a, b) => {
+    if (sort === 'used')   return b.useCount - a.useCount
+    if (sort === 'az')     return a.name.localeCompare(b.name)
+    // recent: lastUsedAt desc, then createdAt desc
+    const ta = a.lastUsedAt ? new Date(a.lastUsedAt).getTime() : new Date(a.createdAt).getTime()
+    const tb = b.lastUsedAt ? new Date(b.lastUsedAt).getTime() : new Date(b.createdAt).getTime()
+    return tb - ta
+  })
 
   if (isEmpty) {
     return (
@@ -513,80 +541,73 @@ function TemplatesTab() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      {manual.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
-              Your routines{!isPro && templateLimit !== null ? ` (${manual.length}/${templateLimit})` : ''}
-            </p>
-            {!isPro && templateLimit !== null && manual.length >= templateLimit && (
-              <Link to="/upgrade?reason=template_limit" className="text-xs font-semibold text-teal-600 hover:underline">
-                ⚡ Upgrade for unlimited
-              </Link>
-            )}
-          </div>
-          <div className="flex flex-col gap-3">
-            {manual.map(t => (
-              <button
-                key={t.id}
-                onClick={() => navigate(`/workouts/templates/${t.id}`)}
-                className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm text-left w-full"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 text-sm">{t.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {t.exercises.length} exercises · Saved {fmtDate(t.createdAt)}
-                      {t.useCount > 0 ? ` · Used ${t.useCount}×` : ''}
-                    </p>
-                  </div>
+    <div>
+      {/* Header row */}
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
+          Your routines{!isPro && templateLimit !== null ? ` (${manualCount}/${templateLimit})` : ''}
+        </p>
+        <div className="relative">
+          <button
+            onClick={() => setShowSortMenu(v => !v)}
+            className="text-xs text-gray-500 flex items-center gap-1"
+          >
+            Sort: {SORT_LABELS[sort]} ▾
+          </button>
+          {showSortMenu && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowSortMenu(false)} />
+              <div className="absolute right-0 top-6 z-20 bg-white border border-gray-100 rounded-xl shadow-xl overflow-hidden min-w-[140px]">
+                {(Object.keys(SORT_LABELS) as SortKey[]).map(s => (
                   <button
-                    onClick={e => handleStart(e, t.id)}
-                    disabled={startingId === t.id}
-                    className="text-sm font-semibold text-teal-600 disabled:opacity-50 shrink-0 py-1 px-2"
+                    key={s}
+                    onClick={() => handleSort(s)}
+                    className={`w-full text-left px-4 py-2.5 text-sm ${sort === s ? 'text-teal-600 font-semibold' : 'text-gray-700'} hover:bg-gray-50`}
                   >
-                    {startingId === t.id ? '…' : 'Start ›'}
+                    {SORT_LABELS[s]}
                   </button>
-                </div>
-              </button>
-            ))}
-          </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
+      </div>
+
+      {!isPro && templateLimit !== null && manualCount >= templateLimit && (
+        <Link to="/upgrade?reason=template_limit" className="text-xs font-semibold text-teal-600 hover:underline block mb-3">
+          ⚡ Upgrade for unlimited routines
+        </Link>
       )}
 
-      {ai.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">AI workouts</p>
-          <div className="flex flex-col gap-3">
-            {ai.map(t => (
+      <div className="flex flex-col gap-3">
+        {sorted.map(t => (
+          <button
+            key={t.id}
+            onClick={() => navigate(`/workouts/templates/${t.id}`)}
+            className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm text-left w-full"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-900 text-sm">{t.name}</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {t.exercises.length} exercises
+                  {t.useCount > 0 ? ` · used ${t.useCount}×` : ''}
+                  {t.lastUsedAt
+                    ? ` · ${Math.floor((Date.now() - new Date(t.lastUsedAt).getTime()) / 86400000)} days ago`
+                    : ''}
+                </p>
+              </div>
               <button
-                key={t.id}
-                onClick={() => navigate(`/workouts/templates/${t.id}`)}
-                className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm text-left w-full"
+                onClick={e => handleStart(e, t.id)}
+                disabled={startingId === t.id}
+                className="text-sm font-semibold text-teal-600 disabled:opacity-50 shrink-0 py-1 px-2"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 text-sm">{t.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {t.exercises.length} exercises
-                      {t.useCount > 0 ? ` · Used ${t.useCount}×` : ''}
-                      {t.lastUsedAt ? ` · Last ${fmtDate(t.lastUsedAt)}` : ''}
-                    </p>
-                  </div>
-                  <button
-                    onClick={e => handleStart(e, t.id)}
-                    disabled={startingId === t.id}
-                    className="text-sm font-semibold text-teal-600 disabled:opacity-50 shrink-0 py-1 px-2"
-                  >
-                    {startingId === t.id ? '…' : 'Start ›'}
-                  </button>
-                </div>
+                {startingId === t.id ? '…' : 'Start ›'}
               </button>
-            ))}
-          </div>
-        </div>
-      )}
+            </div>
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

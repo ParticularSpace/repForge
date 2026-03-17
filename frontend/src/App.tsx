@@ -18,6 +18,7 @@ import UpgradeSuccessPage from '@/pages/UpgradeSuccessPage'
 import UpgradeCancelPage from '@/pages/UpgradeCancelPage'
 import AdminPage from '@/pages/AdminPage'
 import StatsPage from '@/pages/StatsPage'
+import SettingsPage from '@/pages/SettingsPage'
 import OnboardingModal from '@/components/onboarding/OnboardingModal'
 
 function AuthGuard() {
@@ -74,6 +75,7 @@ export default function App() {
         <Route path="/workout/:id/active" element={<ActiveWorkoutPage />} />
         <Route path="/workout/:id/summary" element={<WorkoutSummaryPage />} />
         <Route path="/profile/equipment" element={<EquipmentPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="/workouts/templates/:templateId" element={<TemplateDetailPage />} />
         <Route path="/upgrade/success" element={<UpgradeSuccessPage />} />
         <Route path="/upgrade/cancelled" element={<UpgradeCancelPage />} />

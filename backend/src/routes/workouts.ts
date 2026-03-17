@@ -12,15 +12,25 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 interface PersonalInfo {
   age?: number
   weightLbs?: number
+  heightIn?: number
+  gender?: string
   goal?: string
   equipment?: string
   notes?: string
+}
+
+function fmtHeight(h: number): string {
+  const ft = Math.floor(h / 12)
+  const inches = Math.round(h % 12)
+  return `${ft}'${inches}"`
 }
 
 const GENERATE_PROMPT = (type: string, difficulty: string, info?: PersonalInfo, equipmentPreferences?: string[], muscleFocus?: string[]) => {
   const lines: string[] = []
   if (info?.age)       lines.push(`Athlete age: ${info.age} years`)
   if (info?.weightLbs) lines.push(`Athlete weight: ${info.weightLbs} lbs`)
+  if (info?.heightIn)  lines.push(`Athlete height: ${fmtHeight(info.heightIn)}`)
+  if (info?.gender)    lines.push(`Gender: ${info.gender}`)
   if (info?.goal)      lines.push(`Primary goal: ${info.goal}`)
   if (info?.equipment) lines.push(`Available equipment (only use exercises requiring these): ${info.equipment}`)
   if (info?.notes)     lines.push(`Additional context: ${info.notes}`)
@@ -185,6 +195,8 @@ export async function workoutRoutes(app: FastifyInstance) {
       select: {
         age: true,
         weightLbs: true,
+        heightIn: true,
+        gender: true,
         fitnessGoal: true,
         experienceNotes: true,
         equipmentPreferences: true,
@@ -226,6 +238,8 @@ export async function workoutRoutes(app: FastifyInstance) {
     const profileInfo: PersonalInfo = {
       age: overrides?.age ?? userRecord?.age ?? undefined,
       weightLbs: overrides?.weightLbs ?? userRecord?.weightLbs ?? undefined,
+      heightIn: userRecord?.heightIn ?? undefined,
+      gender: userRecord?.gender ?? undefined,
       goal: overrides?.goal ?? userRecord?.fitnessGoal ?? undefined,
       notes: sanitizeForPrompt(overrides?.notes ?? userRecord?.experienceNotes),
     }

@@ -635,12 +635,20 @@ export default function ProfilePage() {
       {/* Subscription */}
       <SubscriptionSection />
 
-      {/* Equipment row */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm mb-5 flex items-center justify-between">
-        <p className="text-sm font-medium text-gray-700">Equipment preferences</p>
-        <Link to="/profile/equipment" className="text-sm font-semibold text-teal-600 hover:underline">
-          Edit →
-        </Link>
+      {/* Equipment + Settings rows */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm mb-5 overflow-hidden">
+        <div className="p-4 flex items-center justify-between border-b border-gray-50">
+          <p className="text-sm font-medium text-gray-700">Equipment preferences</p>
+          <Link to="/profile/equipment" className="text-sm font-semibold text-teal-600 hover:underline">
+            Edit →
+          </Link>
+        </div>
+        <div className="p-4 flex items-center justify-between">
+          <p className="text-sm font-medium text-gray-700">App settings</p>
+          <Link to="/settings" className="text-sm font-semibold text-teal-600 hover:underline">
+            Open →
+          </Link>
+        </div>
       </div>
 
       {/* Recent workouts */}

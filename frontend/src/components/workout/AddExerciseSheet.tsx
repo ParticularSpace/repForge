@@ -3,6 +3,14 @@ import { useExerciseSearch, useCreateExercise } from '@/hooks/useExerciseLibrary
 import { api } from '@/lib/api'
 import type { LibraryExercise } from '@/types'
 
+export interface AiRecommendation {
+  sets: number
+  reps: number
+  weightLbs: number
+  rationale: string
+  progressionNote: string
+}
+
 interface AddExerciseSheetProps {
   isOpen: boolean
   onClose: () => void
@@ -19,6 +27,9 @@ interface AddExerciseSheetProps {
   currentExOrder?: number
   exerciseList: { name: string; order: number }[]
   defaultRestSeconds: number
+  // When opening from a coaching action, pre-select an exercise
+  preSelected?: { name: string; muscleGroups?: string[] }
+  aiRecommendation?: AiRecommendation | 'loading'
 }
 
 const MUSCLE_GROUP_OPTIONS = [
@@ -53,6 +64,8 @@ export default function AddExerciseSheet({
   currentExOrder,
   exerciseList,
   defaultRestSeconds,
+  preSelected,
+  aiRecommendation,
 }: AddExerciseSheetProps) {
   const [step, setStep] = useState<'search' | 'configure' | 'position'>('search')
   const [query, setQuery] = useState('')
@@ -73,20 +86,54 @@ export default function AddExerciseSheet({
   // Reset when opened
   useEffect(() => {
     if (isOpen) {
-      setStep('search')
       setQuery('')
-      setSelected(null)
-      setSets(3)
-      setReps(10)
-      setWeight(0)
       setRest(defaultRestSeconds)
       setPosition('end')
       setChosenInsertAfter(null)
       setShowCustomForm(false)
       setCustomName('')
       setCustomMuscles([])
+
+      if (preSelected) {
+        // Skip search step — go straight to configure with pre-selected exercise
+        const syntheticEx: LibraryExercise = {
+          id: 'preselected',
+          name: preSelected.name,
+          muscleGroups: preSelected.muscleGroups ?? [],
+          description: '',
+          equipment: '',
+          isCustom: false,
+        }
+        setSelected(syntheticEx)
+        // Use AI recommendation values if available, or sensible defaults
+        if (aiRecommendation && aiRecommendation !== 'loading') {
+          setSets(aiRecommendation.sets)
+          setReps(aiRecommendation.reps)
+          setWeight(aiRecommendation.weightLbs)
+        } else {
+          setSets(3)
+          setReps(10)
+          setWeight(0)
+        }
+        setStep('configure')
+      } else {
+        setSelected(null)
+        setSets(3)
+        setReps(10)
+        setWeight(0)
+        setStep('search')
+      }
     }
-  }, [isOpen, defaultRestSeconds])
+  }, [isOpen, defaultRestSeconds, preSelected]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When AI recommendation arrives after sheet is already open at configure step
+  useEffect(() => {
+    if (aiRecommendation && aiRecommendation !== 'loading' && step === 'configure' && preSelected) {
+      setSets(aiRecommendation.sets)
+      setReps(aiRecommendation.reps)
+      setWeight(aiRecommendation.weightLbs)
+    }
+  }, [aiRecommendation]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Escape key
   useEffect(() => {
@@ -98,7 +145,6 @@ export default function AddExerciseSheet({
 
   const handleSelectExercise = async (ex: LibraryExercise) => {
     setSelected(ex)
-    // Pre-fill weight from previous log
     try {
       const res = await api.get<{ weightLbs: number | null }>(
         `/api/v1/exercises/previous-weight?name=${encodeURIComponent(ex.name)}`
@@ -157,7 +203,7 @@ export default function AddExerciseSheet({
         {/* Header */}
         <div className="px-5 py-3 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
-            {step !== 'search' && (
+            {step !== 'search' && !preSelected && (
               <button
                 onClick={() => setStep(step === 'position' ? 'configure' : 'search')}
                 className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 text-lg"
@@ -283,6 +329,36 @@ export default function AddExerciseSheet({
         {/* ── Step 2: Configure ── */}
         <div className={step === 'configure' ? 'flex flex-col flex-1 overflow-hidden' : 'hidden'}>
           <div className="flex-1 overflow-y-auto px-5 pb-4">
+            {/* AI rationale card — shown only when opened from coaching action */}
+            {preSelected && (
+              <div className="mb-4 mt-2">
+                {aiRecommendation === 'loading' ? (
+                  <div
+                    className="rounded-xl px-4 py-3 flex items-center gap-3"
+                    style={{ backgroundColor: '#E1F5EE', borderColor: '#9FE1CB', borderWidth: '0.5px', borderStyle: 'solid' }}
+                  >
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-teal-600 border-t-transparent shrink-0" />
+                    <p className="text-[12px]" style={{ color: '#085041' }}>Getting AI recommendations…</p>
+                  </div>
+                ) : aiRecommendation ? (
+                  <div
+                    className="rounded-xl px-4 py-3"
+                    style={{ backgroundColor: '#E1F5EE', borderColor: '#9FE1CB', borderWidth: '0.5px', borderStyle: 'solid' }}
+                  >
+                    <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: '#0F6E56' }}>
+                      Why these numbers
+                    </p>
+                    <p className="text-[13px] leading-relaxed mb-1" style={{ color: '#085041' }}>
+                      {aiRecommendation.rationale}
+                    </p>
+                    <p className="text-[12px] italic" style={{ color: '#0F6E56' }}>
+                      {aiRecommendation.progressionNote}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4 mb-6 mt-2">
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1.5">Sets</label>
@@ -367,7 +443,7 @@ export default function AddExerciseSheet({
             {/* Insertion point list */}
             {position === 'choose' && (
               <div className="mt-3 flex flex-col gap-1">
-                {exerciseList.map((ex, i) => (
+                {exerciseList.map((ex) => (
                   <div key={ex.order}>
                     <div className="px-3 py-2 text-sm font-medium text-gray-700">{ex.name}</div>
                     <button
@@ -382,7 +458,6 @@ export default function AddExerciseSheet({
                     </button>
                   </div>
                 ))}
-                {/* Insert at end marker when choose mode */}
                 <button
                   onClick={() => setChosenInsertAfter(null)}
                   className={`w-full text-xs py-2 text-center rounded-lg border transition-colors ${

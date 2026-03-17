@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useProfile } from '@/hooks/useWorkouts'
-import { useTemplates, useUpdateTemplateExercises, useDeleteTemplate, useStartTemplate, useAppendTemplateExercise } from '@/hooks/useTemplates'
+import { useTemplates, useUpdateTemplateExercises, useDeleteTemplate, useStartTemplate } from '@/hooks/useTemplates'
 import EditExerciseModal from '@/components/workout/EditExerciseModal'
+import AddExerciseSheet, { type AiRecommendation } from '@/components/workout/AddExerciseSheet'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import Toast from '@/components/ui/Toast'
 import { formatWeight } from '@/lib/formatWeight'
+import { api } from '@/lib/api'
 import type { ExercisePlan, TemplateExercise } from '@/types'
 
 interface CoachAction {
@@ -21,20 +23,25 @@ export default function TemplateDetailPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { data: profile } = useProfile()
-  const { data: templatesData } = useTemplates()
+  const { data: templatesData, invalidate } = useTemplates() as any
   const updateExercises = useUpdateTemplateExercises(templateId!)
   const deleteTemplate = useDeleteTemplate()
   const startTemplate = useStartTemplate()
-  const appendExercise = useAppendTemplateExercise(templateId!)
 
   const [editTarget, setEditTarget] = useState<TemplateExercise | null>(null)
   const [showConfirm, setShowConfirm] = useState(false)
   const [toast, setToast] = useState(false)
   const [toastMessage, setToastMessage] = useState('Saved!')
   const [isStarting, setIsStarting] = useState(false)
+
+  // AddExerciseSheet for coaching add_exercise action
+  const [showAddSheet, setShowAddSheet] = useState(false)
+  const [addSheetExercise, setAddSheetExercise] = useState<{ name: string; muscleGroups?: string[] } | undefined>()
+  const [aiRecommendation, setAiRecommendation] = useState<AiRecommendation | 'loading' | undefined>()
+
   const coachActionProcessed = useRef(false)
 
-  const template = [...(templatesData?.manual ?? []), ...(templatesData?.ai ?? [])].find(t => t.id === templateId)
+  const template = [...(templatesData?.manual ?? []), ...(templatesData?.ai ?? [])].find((t: any) => t.id === templateId)
 
   // Process coaching action from navigation state once template is loaded
   useEffect(() => {
@@ -46,24 +53,26 @@ export default function TemplateDetailPage() {
     const { type, exerciseName, suggestedSets, suggestedReps, suggestedWeightLbs } = coachAction
 
     if (type === 'add_exercise' && exerciseName) {
-      // Auto-append the suggested exercise to the template
-      appendExercise.mutate(
-        {
-          name: exerciseName,
+      // Open AddExerciseSheet pre-selected, fetch AI recommendation in background
+      setAddSheetExercise({ name: exerciseName })
+      setAiRecommendation('loading')
+      setShowAddSheet(true)
+      // Fetch AI recommendation (fire in background; update state when done)
+      api.post<AiRecommendation>('/api/v1/coaching/exercise-recommendation', {
+        exerciseName,
+        templateId: template.id,
+      }).then(rec => setAiRecommendation(rec)).catch(() => {
+        // Fall back to coaching suggestion values if API fails
+        setAiRecommendation({
           sets: suggestedSets ?? 3,
           reps: suggestedReps ?? 10,
-          weightLbs: suggestedWeightLbs ?? undefined,
-        },
-        {
-          onSuccess: () => {
-            setToastMessage(`${exerciseName} added to your routine!`)
-            setToast(true)
-          },
-        }
-      )
+          weightLbs: suggestedWeightLbs ?? 0,
+          rationale: 'Based on your current routine.',
+          progressionNote: 'Increase weight when reps feel easy.',
+        })
+      })
     } else if ((type === 'add_set' || type === 'increase_weight' || type === 'reduce_volume') && exerciseName) {
-      // Find matching exercise and open edit modal with suggested values pre-filled
-      const match = template.exercises.find(e => e.name.toLowerCase() === exerciseName.toLowerCase())
+      const match = template.exercises.find((e: TemplateExercise) => e.name.toLowerCase() === exerciseName.toLowerCase())
       if (match) {
         const overridden: TemplateExercise = {
           ...match,
@@ -74,7 +83,6 @@ export default function TemplateDetailPage() {
         setEditTarget(overridden)
       }
     }
-    // Clear state from history so back-navigation doesn't re-trigger
     navigate(location.pathname, { replace: true, state: {} })
   }, [template]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -90,6 +98,35 @@ export default function TemplateDetailPage() {
     setEditTarget(null)
     setToastMessage('Saved!')
     setToast(true)
+  }
+
+  const handleAddExercise = async (data: {
+    name: string
+    sets: number
+    reps: number
+    weightLbs: number
+    restSeconds: number
+    muscleGroups?: string[]
+  }) => {
+    setShowAddSheet(false)
+    try {
+      await api.post(`/api/v1/templates/${templateId}/exercises/append`, {
+        name: data.name,
+        sets: data.sets,
+        reps: data.reps,
+        weightLbs: data.weightLbs || undefined,
+        restSeconds: data.restSeconds || undefined,
+      })
+      // Trigger coaching refresh fire-and-forget
+      api.post('/api/v1/coaching/insight', {}).catch(() => {})
+      setToastMessage(`${data.name} added to your routine!`)
+      setToast(true)
+      // Reload templates to reflect addition
+      window.location.reload()
+    } catch {
+      setToastMessage('Failed to add exercise. Try again.')
+      setToast(true)
+    }
   }
 
   const handleDelete = async () => {
@@ -172,7 +209,7 @@ export default function TemplateDetailPage() {
             )}
 
             <div className="flex flex-col gap-3">
-              {template.exercises.map(ex => (
+              {template.exercises.map((ex: TemplateExercise) => (
                 <div key={ex.id} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-gray-900 text-sm">{ex.name}</p>
@@ -238,6 +275,17 @@ export default function TemplateDetailPage() {
           onClose={() => setEditTarget(null)}
         />
       )}
+
+      <AddExerciseSheet
+        isOpen={showAddSheet}
+        onClose={() => { setShowAddSheet(false); setAiRecommendation(undefined) }}
+        onAdd={handleAddExercise}
+        context="preview"
+        exerciseList={template.exercises.map((e: TemplateExercise) => ({ name: e.name, order: e.order }))}
+        defaultRestSeconds={profile?.preferredRestSeconds ?? 60}
+        preSelected={addSheetExercise}
+        aiRecommendation={aiRecommendation}
+      />
 
       {showConfirm && (
         <ConfirmDialog
