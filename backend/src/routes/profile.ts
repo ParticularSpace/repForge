@@ -1,10 +1,16 @@
 import { FastifyInstance } from 'fastify'
+import { createClient } from '@supabase/supabase-js'
 import { authenticate } from '../middleware/auth'
 import { prisma } from '../lib/prisma'
 import { isPro } from '../lib/userPlan'
 import { isAdmin } from '../lib/admin'
 import { getWeekStart } from '../lib/dateUtils'
 import { profileUpdateSchema } from '../lib/validation'
+
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 import {
   getCurrentWeekProgress,
   getWeeklyStreak,
@@ -242,5 +248,49 @@ export async function profileRoutes(app: FastifyInstance) {
         exerciseCount: w._count.exercises,
       })),
     }
+  })
+
+  // DELETE /profile/data — verify password then wipe all workout data for the user
+  app.delete('/profile/data', { preHandler: [authenticate] }, async (request, reply) => {
+    const userId = request.user.id
+    const { password } = request.body as { password?: string }
+
+    if (!password?.trim()) {
+      return reply.status(400).send({ error: 'Password is required' })
+    }
+
+    // Look up the user's email so we can verify their password
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } })
+    if (!user?.email) return reply.status(404).send({ error: 'User not found' })
+
+    // Verify password via Supabase auth
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: password.trim(),
+    })
+    if (authError) {
+      return reply.status(401).send({ error: 'Incorrect password' })
+    }
+
+    // Delete all workout data — order matters due to FK constraints
+    // SetLogs cascade from Exercises which cascade from Workouts
+    // TemplateExercises cascade from WorkoutTemplates
+    await prisma.$transaction([
+      prisma.weightLog.deleteMany({ where: { userId } }),
+      prisma.weeklyGoalResult.deleteMany({ where: { userId } }),
+      prisma.workout.deleteMany({ where: { userId } }),
+      prisma.workoutTemplate.deleteMany({ where: { userId } }),
+      // Reset coaching insight cache and pinned template
+      prisma.user.update({
+        where: { id: userId },
+        data: {
+          pinnedTemplateId: null,
+          lastCoachingInsight: null,
+          lastCoachingGeneratedAt: null,
+        },
+      }),
+    ])
+
+    return { success: true }
   })
 }
