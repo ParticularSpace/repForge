@@ -7,6 +7,7 @@ import { useExerciseSearch, useCreateExercise } from '@/hooks/useExerciseLibrary
 import EditExerciseModal from '@/components/workout/EditExerciseModal'
 import Toast from '@/components/ui/Toast'
 import Chip from '@/components/ui/Chip'
+import GeneratingButton from '@/components/ui/GeneratingButton'
 import { formatWeight } from '@/lib/formatWeight'
 import type { WorkoutType, Difficulty, ExercisePlan, LibraryExercise, WorkoutTemplate } from '@/types'
 
@@ -111,17 +112,13 @@ function GenerateTab({ isPro }: { isPro: boolean }) {
           </Link>
         )}
 
-        <button
+        <GeneratingButton
+          isGenerating={generate.isPending}
           onClick={handleGenerate}
-          disabled={generate.isPending}
-          className="bg-teal-600 text-white rounded-xl py-3.5 w-full font-semibold text-base disabled:opacity-60 flex items-center justify-center gap-2"
-        >
-          {generate.isPending ? (
-            <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Generating…</>
-          ) : (
-            `Generate a ${typeLabel} workout`
-          )}
-        </button>
+          label={`Generate a ${typeLabel} workout`}
+          generatingLabel="Building your workout..."
+          estimatedSeconds={22}
+        />
 
         {generate.isError && (
           <p className="mt-3 text-xs text-red-500 text-center bg-red-50 rounded-lg py-2 px-3">

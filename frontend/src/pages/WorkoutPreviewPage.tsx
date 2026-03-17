@@ -6,6 +6,7 @@ import ExerciseInfoModal from '@/components/workout/ExerciseInfoModal'
 import EditExerciseModal from '@/components/workout/EditExerciseModal'
 import AddExerciseSheet from '@/components/workout/AddExerciseSheet'
 import Toast from '@/components/ui/Toast'
+import GeneratingButton from '@/components/ui/GeneratingButton'
 import { formatWeight } from '@/lib/formatWeight'
 import { api } from '@/lib/api'
 import type { WorkoutPlan, WorkoutType, Difficulty, ExercisePlan } from '@/types'
@@ -84,26 +85,22 @@ function SwapSheet({
         <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
         <p className="font-semibold text-gray-900 mb-4">Replace {exercise.name}</p>
 
-        {!suggestion && (
+        {(!suggestion || suggestion === 'loading') && (
           <div className="flex flex-col gap-3">
             <button
               onClick={() => setShowSearch(true)}
-              className="w-full border border-gray-200 rounded-xl py-3.5 text-sm font-medium text-gray-700 text-left px-4"
+              disabled={suggestion === 'loading'}
+              className="w-full border border-gray-200 rounded-xl py-3.5 text-sm font-medium text-gray-700 text-left px-4 disabled:opacity-40"
             >
               Search for a different exercise
             </button>
-            <button
+            <GeneratingButton
+              isGenerating={suggestion === 'loading'}
               onClick={handleSuggest}
-              className="w-full bg-teal-600 text-white rounded-xl py-3.5 text-sm font-semibold"
-            >
-              Suggest an alternative
-            </button>
-          </div>
-        )}
-
-        {suggestion === 'loading' && (
-          <div className="flex justify-center py-8">
-            <span className="h-6 w-6 animate-spin rounded-full border-2 border-teal-600 border-t-transparent" />
+              label="Suggest an alternative"
+              generatingLabel="Finding an alternative..."
+              estimatedSeconds={8}
+            />
           </div>
         )}
 

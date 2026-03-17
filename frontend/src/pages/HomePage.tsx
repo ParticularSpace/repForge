@@ -406,6 +406,7 @@ export default function HomePage() {
 import { useState as useStateGen } from 'react'
 import Chip from '@/components/ui/Chip'
 import { Link } from 'react-router-dom'
+import GeneratingButton from '@/components/ui/GeneratingButton'
 import { useGenerateWorkout } from '@/hooks/useWorkouts'
 import type { WorkoutType, Difficulty } from '@/types'
 
@@ -454,17 +455,13 @@ function NewUserGeneratorCard() {
           Upgrade for unlimited AI workouts →
         </Link>
       ) : (
-        <button
+        <GeneratingButton
+          isGenerating={generate.isPending}
           onClick={handleGenerate}
-          disabled={generate.isPending}
-          className="bg-teal-600 text-white rounded-xl py-3.5 w-full font-semibold text-base disabled:opacity-60 flex items-center justify-center gap-2"
-        >
-          {generate.isPending ? (
-            <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Generating…</>
-          ) : (
-            `Generate a ${typeLabel} workout`
-          )}
-        </button>
+          label={`Generate a ${typeLabel} workout`}
+          generatingLabel="Building your workout..."
+          estimatedSeconds={22}
+        />
       )}
       {!isPro && (
         <p className="mt-2 text-center text-xs text-gray-400">
