@@ -10,6 +10,16 @@ export interface ParsedDescription {
 export function parseExerciseDescription(description: string | null): ParsedDescription {
   if (!description) return { type: 'plain', raw: '' }
 
+  // DIAGNOSTIC — remove after confirming parser works
+  console.log('=== RAW DESCRIPTION ===')
+  console.log(JSON.stringify(description))
+  console.log('=== HEADER CHECKS ===')
+  console.log('find:', /find:/i.test(description))
+  console.log('FIND THE MACHINE:', /FIND THE MACHINE/i.test(description))
+  console.log('steps:', /steps:/i.test(description))
+  console.log('HOW TO DO IT:', /HOW TO DO IT/i.test(description))
+  console.log('=== END ===')
+
   // Detect structured format — case-insensitive check
   const hasStructure = /find:/i.test(description) && /steps:/i.test(description)
 
