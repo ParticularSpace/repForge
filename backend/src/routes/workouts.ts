@@ -436,6 +436,45 @@ export async function workoutRoutes(app: FastifyInstance) {
 
     if (!workout) return reply.status(404).send({ message: 'Not found' })
     if (workout.userId !== user.id) return reply.status(403).send({ message: 'Forbidden' })
+
+    // Supplement exercises missing descriptions from history + library
+    const blankNames = [...new Set(
+      workout.exercises.filter(e => !e.description).map(e => e.name)
+    )]
+
+    if (blankNames.length > 0) {
+      const [libEntries, historyEntries] = await Promise.all([
+        prisma.exerciseLibrary.findMany({
+          where: { name: { in: blankNames } },
+          select: { name: true, description: true, muscleGroups: true },
+        }),
+        prisma.exercise.findMany({
+          where: { workout: { userId: user.id }, name: { in: blankNames }, description: { not: null } },
+          select: { name: true, description: true, coachingCue: true, modification: true, muscleGroups: true, workout: { select: { startedAt: true } } },
+          orderBy: { workout: { startedAt: 'desc' } },
+        }),
+      ])
+      const libByName = new Map(libEntries.map(e => [e.name.toLowerCase(), e]))
+      const histByName = new Map<string, typeof historyEntries[0]>()
+      for (const e of historyEntries) {
+        const key = e.name.toLowerCase()
+        if (!histByName.has(key)) histByName.set(key, e)
+      }
+
+      workout.exercises = workout.exercises.map(e => {
+        if (e.description) return e
+        const key = e.name.toLowerCase()
+        const hist = histByName.get(key)
+        const lib = libByName.get(key)
+        return {
+          ...e,
+          description: hist?.description ?? lib?.description ?? null,
+          coachingCue: e.coachingCue ?? hist?.coachingCue ?? null,
+          modification: e.modification ?? hist?.modification ?? null,
+        }
+      })
+    }
+
     return workout
   })
 

@@ -62,21 +62,24 @@ export async function templateRoutes(fastify: FastifyInstance) {
       : []
     const libraryByName = new Map(libraryEntries.map(e => [e.name.toLowerCase(), e]))
 
-    // Fetch most recent AI-generated Exercise record per name for this user —
-    // these have rich structured descriptions. Use groupBy workaround via distinct.
-    const recentExercises = allNames.length > 0
+    // Fetch all Exercise records for these names (with descriptions) ordered newest first.
+    // Deduplicate in JS — keeps the most recent structured description per name.
+    const allExercises = allNames.length > 0
       ? await prisma.exercise.findMany({
           where: {
             workout: { userId },
             name: { in: allNames },
             description: { not: null },
           },
-          select: { name: true, description: true, coachingCue: true, modification: true, muscleGroups: true },
+          select: { name: true, description: true, coachingCue: true, modification: true, muscleGroups: true, workout: { select: { startedAt: true } } },
           orderBy: { workout: { startedAt: 'desc' } },
-          distinct: ['name'],
         })
       : []
-    const exerciseByName = new Map(recentExercises.map(e => [e.name.toLowerCase(), e]))
+    const exerciseByName = new Map<string, typeof allExercises[0]>()
+    for (const e of allExercises) {
+      const key = e.name.toLowerCase()
+      if (!exerciseByName.has(key)) exerciseByName.set(key, e)
+    }
 
     const manual = templates.filter(t => t.source === 'manual').map(t => mapTemplate(t, libraryByName, exerciseByName))
     const ai = templates.filter(t => t.source === 'ai').map(t => mapTemplate(t, libraryByName, exerciseByName))
