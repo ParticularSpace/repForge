@@ -3,7 +3,11 @@ import { authenticate } from '../middleware/auth'
 import { prisma } from '../lib/prisma'
 import { isPro } from '../lib/userPlan'
 
-function mapTemplate(t: any, libraryByName: Map<string, { description: string | null; muscleGroups: any }> = new Map()) {
+function mapTemplate(
+  t: any,
+  libraryByName: Map<string, { description: string | null; muscleGroups: any }> = new Map(),
+  exerciseByName: Map<string, { description: string | null; coachingCue: string | null; modification: string | null; muscleGroups: any }> = new Map(),
+) {
   return {
     id: t.id,
     name: t.name,
@@ -16,7 +20,9 @@ function mapTemplate(t: any, libraryByName: Map<string, { description: string | 
     exercises: (t.exercises ?? [])
       .sort((a: any, b: any) => a.order - b.order)
       .map((e: any) => {
-        const lib = libraryByName.get(e.name.toLowerCase())
+        const key = e.name.toLowerCase()
+        const ex = exerciseByName.get(key)  // rich AI-generated description (preferred)
+        const lib = libraryByName.get(key)  // seed fallback
         return {
           id: e.id,
           name: e.name,
@@ -25,8 +31,10 @@ function mapTemplate(t: any, libraryByName: Map<string, { description: string | 
           reps: e.reps,
           weightLbs: e.weightLbs,
           restSeconds: e.restSeconds,
-          muscleGroups: (e.muscleGroups as string[] | null) ?? lib?.muscleGroups ?? [],
-          description: lib?.description ?? null,
+          muscleGroups: (e.muscleGroups as string[] | null) ?? ex?.muscleGroups ?? lib?.muscleGroups ?? [],
+          description: ex?.description ?? lib?.description ?? null,
+          coachingCue: ex?.coachingCue ?? null,
+          modification: ex?.modification ?? null,
         }
       }),
   }
@@ -43,8 +51,9 @@ export async function templateRoutes(fastify: FastifyInstance) {
       orderBy: [{ lastUsedAt: 'desc' }, { createdAt: 'desc' }],
     })
 
-    // Batch-fetch library descriptions for all exercise names
     const allNames = [...new Set(templates.flatMap(t => t.exercises.map(e => e.name)))]
+
+    // Fetch library entries as a baseline (plain text descriptions from seed)
     const libraryEntries = allNames.length > 0
       ? await prisma.exerciseLibrary.findMany({
           where: { name: { in: allNames } },
@@ -53,8 +62,24 @@ export async function templateRoutes(fastify: FastifyInstance) {
       : []
     const libraryByName = new Map(libraryEntries.map(e => [e.name.toLowerCase(), e]))
 
-    const manual = templates.filter(t => t.source === 'manual').map(t => mapTemplate(t, libraryByName))
-    const ai = templates.filter(t => t.source === 'ai').map(t => mapTemplate(t, libraryByName))
+    // Fetch most recent AI-generated Exercise record per name for this user —
+    // these have rich structured descriptions. Use groupBy workaround via distinct.
+    const recentExercises = allNames.length > 0
+      ? await prisma.exercise.findMany({
+          where: {
+            workout: { userId },
+            name: { in: allNames },
+            description: { not: null },
+          },
+          select: { name: true, description: true, coachingCue: true, modification: true, muscleGroups: true },
+          orderBy: { workout: { startedAt: 'desc' } },
+          distinct: ['name'],
+        })
+      : []
+    const exerciseByName = new Map(recentExercises.map(e => [e.name.toLowerCase(), e]))
+
+    const manual = templates.filter(t => t.source === 'manual').map(t => mapTemplate(t, libraryByName, exerciseByName))
+    const ai = templates.filter(t => t.source === 'ai').map(t => mapTemplate(t, libraryByName, exerciseByName))
 
     return { manual, ai }
   })

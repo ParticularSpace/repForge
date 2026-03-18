@@ -229,6 +229,8 @@ export interface TemplateExercise {
   restSeconds?: number | null
   muscleGroups: string[]
   description?: string | null
+  coachingCue?: string | null
+  modification?: string | null
 }
 
 export interface WorkoutTemplate {
