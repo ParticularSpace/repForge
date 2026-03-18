@@ -419,6 +419,23 @@ export async function templateRoutes(fastify: FastifyInstance) {
     if (!template) return reply.code(404).send({ error: 'Template not found' })
     if (template.userId !== userId) return reply.code(403).send({ error: 'Forbidden' })
 
+    // Look up rich descriptions for each exercise name
+    const names = template.exercises.map(e => e.name)
+    const [libraryEntries, recentExercises] = await Promise.all([
+      prisma.exerciseLibrary.findMany({
+        where: { name: { in: names } },
+        select: { name: true, description: true, muscleGroups: true },
+      }),
+      prisma.exercise.findMany({
+        where: { workout: { userId }, name: { in: names }, description: { not: null } },
+        select: { name: true, description: true, coachingCue: true, modification: true, muscleGroups: true },
+        orderBy: { workout: { startedAt: 'desc' } },
+        distinct: ['name'],
+      }),
+    ])
+    const libByName = new Map(libraryEntries.map(e => [e.name.toLowerCase(), e]))
+    const exByName = new Map(recentExercises.map(e => [e.name.toLowerCase(), e]))
+
     const workout = await prisma.workout.create({
       data: {
         userId,
@@ -426,14 +443,22 @@ export async function templateRoutes(fastify: FastifyInstance) {
         type: template.type ?? 'full_body',
         difficulty: 'intermediate',
         exercises: {
-          create: template.exercises.map(e => ({
-            name: e.name,
-            order: e.order,
-            sets: e.sets,
-            reps: e.reps,
-            weightLbs: e.weightLbs,
-            muscleGroups: e.muscleGroups ?? [],
-          })),
+          create: template.exercises.map(e => {
+            const key = e.name.toLowerCase()
+            const rich = exByName.get(key)
+            const lib = libByName.get(key)
+            return {
+              name: e.name,
+              order: e.order,
+              sets: e.sets,
+              reps: e.reps,
+              weightLbs: e.weightLbs,
+              muscleGroups: e.muscleGroups ?? rich?.muscleGroups ?? lib?.muscleGroups ?? [],
+              description: rich?.description ?? lib?.description ?? null,
+              coachingCue: rich?.coachingCue ?? null,
+              modification: rich?.modification ?? null,
+            }
+          }),
         },
       },
     })
