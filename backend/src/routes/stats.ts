@@ -1,7 +1,9 @@
 import { FastifyInstance } from 'fastify'
 import { Prisma } from '@prisma/client'
+import { subWeeks } from 'date-fns'
 import { authenticate } from '../middleware/auth'
 import { prisma } from '../lib/prisma'
+import { getWeekStart, getWeekEnd, getWeeklyStreak } from '../lib/weeklyGoals'
 
 // Parse optional ISO date query params, returning sensible defaults
 function parseDateRange(q: { from?: string; to?: string }): { fromDate: Date; toDate: Date } {
@@ -53,10 +55,11 @@ export async function statsRoutes(app: FastifyInstance) {
   app.get('/stats/logged-exercises', { preHandler: [authenticate] }, async (request) => {
     const userId = request.user.id
 
-    const rows = await prisma.$queryRaw<Array<{ name: string; session_count: number }>>(Prisma.sql`
+    const rows = await prisma.$queryRaw<Array<{ name: string; session_count: number; last_logged_at: Date | null }>>(Prisma.sql`
       SELECT
         MIN(e.name) AS name,
-        CAST(COUNT(DISTINCT w.id) AS integer) AS session_count
+        CAST(COUNT(DISTINCT w.id) AS integer) AS session_count,
+        MAX(w.started_at) AS last_logged_at
       FROM set_logs sl
       JOIN exercises e ON sl.exercise_id = e.id
       JOIN workouts w ON e.workout_id = w.id
@@ -66,7 +69,11 @@ export async function statsRoutes(app: FastifyInstance) {
       ORDER BY session_count DESC
     `)
 
-    return rows.map(r => ({ name: r.name, sessionCount: r.session_count }))
+    return rows.map(r => ({
+      name: r.name,
+      sessionCount: r.session_count,
+      lastLoggedAt: r.last_logged_at ? r.last_logged_at.toISOString() : null,
+    }))
   })
 
   // ── Exercise progression ──────────────────────────────────────────────────
@@ -254,6 +261,185 @@ export async function statsRoutes(app: FastifyInstance) {
       currentWeight,
       change,
     }
+  })
+
+  // ── Consistency ───────────────────────────────────────────────────────────
+  // GET /stats/consistency — last 12 weeks hit/miss data
+  app.get('/stats/consistency', { preHandler: [authenticate] }, async (request) => {
+    const userId = request.user.id
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { weeklyGoal: true },
+    })
+    const goal = user?.weeklyGoal ?? 3
+
+    const now = new Date()
+    const thisWeekStart = getWeekStart(now)
+
+    // Build 12-week array oldest→newest (week 1 = 11 weeks ago, week 12 = current)
+    const weeks = Array.from({ length: 12 }, (_, i) => {
+      const weekStart = subWeeks(thisWeekStart, 11 - i)
+      return {
+        weekStart,
+        weekNumber: i + 1,
+        isCurrent: weekStart.getTime() === thisWeekStart.getTime(),
+      }
+    })
+
+    // Fetch stored results for past weeks
+    const stored = await prisma.weeklyGoalResult.findMany({
+      where: {
+        userId,
+        weekStart: { gte: weeks[0].weekStart, lte: thisWeekStart },
+      },
+    })
+    const storedMap = new Map(stored.map(r => [r.weekStart.getTime(), r]))
+
+    // Count current week live
+    const weekEnd = getWeekEnd(now)
+    const currentCompleted = await prisma.workout.count({
+      where: { userId, completedAt: { gte: thisWeekStart, lte: weekEnd } },
+    })
+
+    const result = weeks.map(w => {
+      if (w.isCurrent) {
+        const met = currentCompleted >= goal
+        return {
+          weekStart: w.weekStart.toISOString().split('T')[0],
+          weekNumber: w.weekNumber,
+          goal,
+          completed: currentCompleted,
+          met,
+          isCurrent: true,
+        }
+      }
+      const record = storedMap.get(w.weekStart.getTime())
+      return {
+        weekStart: w.weekStart.toISOString().split('T')[0],
+        weekNumber: w.weekNumber,
+        goal: record?.goal ?? goal,
+        completed: record?.completed ?? 0,
+        met: record?.met ?? false,
+        isCurrent: false,
+      }
+    })
+
+    const weeksHit = result.filter(w => w.met).length
+    const currentStreak = await getWeeklyStreak(userId, prisma)
+    // Extend streak by 1 if current week is already met
+    const effectiveStreak = result[11].met ? currentStreak + 1 : currentStreak
+
+    return {
+      weeks: result,
+      summary: { weeksHit, currentStreak: effectiveStreak, totalWeeks: 12 },
+    }
+  })
+
+  // ── Strength progression ───────────────────────────────────────────────────
+  // GET /stats/strength-progression?exercise=X&range=30d|90d|all
+  app.get('/stats/strength-progression', { preHandler: [authenticate] }, async (request, reply) => {
+    const userId = request.user.id
+    const q = request.query as { exercise?: string; range?: string }
+    if (!q.exercise) return reply.code(400).send({ error: 'exercise is required' })
+
+    const range = q.range ?? '90d'
+    const now = new Date()
+    let fromDate: Date
+    if (range === '30d') {
+      fromDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    } else if (range === '90d') {
+      fromDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+    } else {
+      fromDate = new Date('2000-01-01')
+    }
+
+    // All-time max — always before range filter
+    const [allTimeRow] = await prisma.$queryRaw<Array<{ max_weight: number | null }>>(Prisma.sql`
+      SELECT CAST(MAX(sl.actual_weight) AS float8) AS max_weight
+      FROM set_logs sl
+      JOIN exercises e ON sl.exercise_id = e.id
+      JOIN workouts w ON e.workout_id = w.id
+      WHERE w.user_id = ${userId}
+        AND LOWER(e.name) = LOWER(${q.exercise})
+        AND sl.actual_weight IS NOT NULL
+    `)
+    const allTimePR = allTimeRow?.max_weight ?? null
+
+    // Sessions in range
+    const rows = await prisma.$queryRaw<Array<{ date: string; max_weight: number; reps: number }>>(Prisma.sql`
+      SELECT DISTINCT ON (DATE(w.started_at))
+        TO_CHAR(DATE(w.started_at), 'YYYY-MM-DD') AS date,
+        CAST(sl.actual_weight AS float8) AS max_weight,
+        sl.actual_reps AS reps
+      FROM set_logs sl
+      JOIN exercises e ON sl.exercise_id = e.id
+      JOIN workouts w ON e.workout_id = w.id
+      WHERE w.user_id = ${userId}
+        AND LOWER(e.name) = LOWER(${q.exercise})
+        AND sl.actual_weight IS NOT NULL
+        AND sl.actual_reps IS NOT NULL
+        AND w.started_at >= ${fromDate}
+      ORDER BY DATE(w.started_at), sl.actual_weight DESC
+    `)
+
+    const dataPoints = rows.map(r => ({
+      date: r.date,
+      maxWeight: r.max_weight,
+      reps: r.reps,
+      isPR: allTimePR !== null && r.max_weight >= allTimePR,
+    }))
+
+    const firstWeight = dataPoints.length > 0 ? dataPoints[0].maxWeight : null
+    const latestWeight = dataPoints.length > 0 ? dataPoints[dataPoints.length - 1].maxWeight : null
+    const delta = firstWeight !== null && latestWeight !== null ? Math.round((latestWeight - firstWeight) * 10) / 10 : null
+
+    return {
+      exerciseName: q.exercise,
+      dataPoints,
+      summary: {
+        firstWeight,
+        latestWeight,
+        delta,
+        sessionCount: dataPoints.length,
+        allTimePR,
+      },
+    }
+  })
+
+  // ── Training days ─────────────────────────────────────────────────────────
+  // GET /stats/training-days — workout count per day of week, all time
+  app.get('/stats/training-days', { preHandler: [authenticate] }, async (request) => {
+    const userId = request.user.id
+
+    const rows = await prisma.$queryRaw<Array<{ dow: number; count: number }>>(Prisma.sql`
+      SELECT
+        EXTRACT(DOW FROM w.completed_at)::integer AS dow,
+        CAST(COUNT(*) AS integer) AS count
+      FROM workouts w
+      WHERE w.user_id = ${userId}
+        AND w.completed_at IS NOT NULL
+      GROUP BY EXTRACT(DOW FROM w.completed_at)
+    `)
+
+    const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    // JS DOW: 0=Sunday → mondayIndex = (dow + 6) % 7
+    const countByMonday = new Map<number, number>()
+    for (const row of rows) {
+      const mondayIdx = (row.dow + 6) % 7
+      countByMonday.set(mondayIdx, row.count)
+    }
+
+    const days = DAY_NAMES.map((name, i) => ({
+      dayName: name,
+      dayIndex: i,
+      count: countByMonday.get(i) ?? 0,
+    }))
+
+    const maxDay = days.reduce((best, d) => d.count > best.count ? d : best, days[0])
+    const mostActiveDay = maxDay.count > 0 ? maxDay.dayName : null
+
+    return { days, mostActiveDay }
   })
 
   // ── Body weight POST ──────────────────────────────────────────────────────

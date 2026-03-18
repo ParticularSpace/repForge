@@ -16,6 +16,51 @@ export interface CalendarDay {
 export interface LoggedExercise {
   name: string
   sessionCount: number
+  lastLoggedAt: string | null
+}
+
+export interface ConsistencyWeek {
+  weekStart: string
+  weekNumber: number
+  goal: number
+  completed: number
+  met: boolean
+  isCurrent: boolean
+}
+
+export interface ConsistencyData {
+  weeks: ConsistencyWeek[]
+  summary: { weeksHit: number; currentStreak: number; totalWeeks: number }
+}
+
+export interface StrengthDataPoint {
+  date: string
+  maxWeight: number
+  reps: number
+  isPR: boolean
+}
+
+export interface StrengthProgression {
+  exerciseName: string
+  dataPoints: StrengthDataPoint[]
+  summary: {
+    firstWeight: number | null
+    latestWeight: number | null
+    delta: number | null
+    sessionCount: number
+    allTimePR: number | null
+  }
+}
+
+export interface TrainingDay {
+  dayName: string
+  dayIndex: number
+  count: number
+}
+
+export interface TrainingDaysData {
+  days: TrainingDay[]
+  mostActiveDay: string | null
 }
 
 export interface ProgressionPoint {
@@ -121,5 +166,33 @@ export function useLogWeight() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['stats', 'weight'] })
     },
+  })
+}
+
+export function useConsistency() {
+  return useQuery({
+    queryKey: ['stats', 'consistency'],
+    queryFn: () => api.get<ConsistencyData>('/api/v1/stats/consistency'),
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useStrengthProgression(exercise: string, range: '30d' | '90d' | 'all') {
+  return useQuery({
+    queryKey: ['stats', 'strength', exercise, range],
+    queryFn: () =>
+      api.get<StrengthProgression>(
+        `/api/v1/stats/strength-progression?exercise=${encodeURIComponent(exercise)}&range=${range}`
+      ),
+    enabled: !!exercise,
+    staleTime: 1000 * 60 * 10,
+  })
+}
+
+export function useTrainingDays() {
+  return useQuery({
+    queryKey: ['stats', 'training-days'],
+    queryFn: () => api.get<TrainingDaysData>('/api/v1/stats/training-days'),
+    staleTime: 1000 * 60 * 15,
   })
 }
