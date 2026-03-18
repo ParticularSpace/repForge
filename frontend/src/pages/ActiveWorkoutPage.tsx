@@ -4,6 +4,8 @@ import { useWorkout, useCompleteWorkout, useLogSet, useProfile, useProfileStats 
 import ExerciseCard from '@/components/workout/ExerciseCard'
 import RestTimer from '@/components/workout/RestTimer'
 import ExerciseGuidanceSheet from '@/components/workout/ExerciseGuidanceSheet'
+import { parseExerciseDescription } from '@/lib/parseExerciseDescription'
+import { formatWeight } from '@/lib/formatWeight'
 import type { Exercise } from '@/types'
 
 const GUIDANCE_HINT_KEY = 'repflow_guidance_hint_shown'
@@ -111,6 +113,7 @@ export default function ActiveWorkoutPage() {
   const doneSets = completedSets[currentEx.id] ?? 0
   const nextEx = exercises[currentExIdx + 1]
   const progressPct = exercises.length > 0 ? (currentExIdx / exercises.length) * 100 : 0
+  const parsedDescription = parseExerciseDescription(currentEx.description ?? null)
 
   return (
     <div className="min-h-dvh bg-gray-50 flex flex-col">
@@ -162,31 +165,51 @@ export default function ActiveWorkoutPage() {
             />
           )}
 
-          {nextEx && !showRest && (
-            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Up next</p>
-              <p className="font-semibold text-gray-700 flex items-baseline flex-wrap gap-x-2">
-                <button
-                  onClick={() => openGuidance(nextEx)}
-                  className="font-semibold text-gray-700 text-left bg-transparent border-0 p-0 cursor-pointer"
-                  style={{
-                    textDecoration: 'underline',
-                    textDecorationColor: '#e5e7eb',
-                    textUnderlineOffset: '3px',
-                  }}
-                >
-                  {nextEx.name}
-                </button>
-                <span className="text-sm text-gray-400 font-normal">
-                  {nextEx.sets} × {nextEx.reps}
-                  {` · ${nextEx.weightLbs ? `${nextEx.weightLbs} lbs` : 'No weight set'}`}
-                </span>
+          {/* What you should feel — shown when not resting */}
+          {!showRest && parsedDescription.type === 'structured' && parsedDescription.feel && (
+            <div
+              className="rounded-xl px-3.5 py-3"
+              style={{ backgroundColor: '#E8F8F2', borderLeft: '3px solid #1D9E75' }}
+            >
+              <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: '#0F6E56' }}>
+                What you should feel
+              </p>
+              <p className="text-[13px] leading-snug" style={{ color: '#085041' }}>
+                {parsedDescription.feel}
               </p>
             </div>
           )}
 
+          {/* Coaching cue */}
+          {currentEx.coachingCue && (
+            <div className="flex items-start gap-2 px-1">
+              <span className="text-xs leading-none mt-0.5">💡</span>
+              <p className="text-xs text-gray-400 leading-snug">{currentEx.coachingCue}</p>
+            </div>
+          )}
+
+          {/* Up next — slim single row */}
+          {nextEx && (
+            <div className="flex items-center gap-1.5 px-1">
+              <p className="text-xs text-gray-300 shrink-0">Up next</p>
+              <span className="text-gray-200">·</span>
+              <button
+                onClick={() => openGuidance(nextEx)}
+                className="text-xs text-gray-400 font-medium bg-transparent border-0 p-0 cursor-pointer truncate"
+                style={{ textDecoration: 'underline', textDecorationColor: '#e5e7eb', textUnderlineOffset: '3px' }}
+              >
+                {nextEx.name}
+              </button>
+              <span className="text-gray-200 shrink-0">·</span>
+              <p className="text-xs text-gray-300 shrink-0">
+                {nextEx.sets}×{nextEx.reps} {formatWeight(nextEx.weightLbs, undefined)}
+              </p>
+            </div>
+          )}
+
+          {/* Dot indicators */}
           {exercises.length > 1 && (
-            <div className="flex gap-1.5 justify-center py-2">
+            <div className="flex gap-1.5 justify-center py-1">
               {exercises.map((_, i) => (
                 <div
                   key={i}
@@ -197,13 +220,6 @@ export default function ActiveWorkoutPage() {
                   }`}
                 />
               ))}
-            </div>
-          )}
-
-          {currentEx.coachingCue && (
-            <div className="flex items-start gap-2.5 px-1">
-              <span className="text-sm leading-none mt-0.5">💡</span>
-              <p className="text-xs text-gray-500 leading-snug">{currentEx.coachingCue}</p>
             </div>
           )}
         </div>
