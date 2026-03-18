@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useWorkout } from '@/hooks/useWorkouts'
+import ExerciseGuidanceSheet from '@/components/workout/ExerciseGuidanceSheet'
 import { api } from '@/lib/api'
-import type { Workout } from '@/types'
+import type { Exercise, Workout } from '@/types'
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', {
@@ -16,6 +17,7 @@ export default function WorkoutDetailPage() {
   const { data: workout, isLoading } = useWorkout(id)
   const [startingAgain, setStartingAgain] = useState(false)
   const [loadingEdit, setLoadingEdit] = useState(false)
+  const [guidanceExercise, setGuidanceExercise] = useState<Exercise | null>(null)
 
   if (isLoading) {
     return (
@@ -86,6 +88,7 @@ export default function WorkoutDetailPage() {
   }
 
   return (
+    <>
     <div className="min-h-dvh bg-gray-50 flex flex-col">
       {/* Header */}
       <div className="bg-white border-b border-gray-100 pt-safe">
@@ -110,7 +113,13 @@ export default function WorkoutDetailPage() {
           <div className="flex flex-col gap-3">
             {exercises.map(ex => (
               <div key={ex.id} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-                <p className="font-semibold text-gray-900 mb-2">{ex.name}</p>
+                <button
+                  onClick={() => setGuidanceExercise(ex)}
+                  className="font-semibold text-gray-900 text-left bg-transparent border-0 p-0 cursor-pointer mb-2"
+                  style={{ textDecoration: 'underline', textDecorationColor: '#e5e7eb', textUnderlineOffset: '3px' }}
+                >
+                  {ex.name}
+                </button>
                 <p className="text-xs text-gray-400 mb-3">
                   {ex.sets} sets × {ex.reps} reps
                   {ex.weightLbs ? ` · ${ex.weightLbs} lbs` : ''}
@@ -158,5 +167,13 @@ export default function WorkoutDetailPage() {
         </div>
       </div>
     </div>
+
+      {guidanceExercise && (
+        <ExerciseGuidanceSheet
+          exercise={guidanceExercise}
+          onClose={() => setGuidanceExercise(null)}
+        />
+      )}
+    </>
   )
 }
