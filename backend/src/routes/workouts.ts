@@ -115,42 +115,38 @@ If the user has specified equipment preferences, only use exercises that require
 
 FIELD DEFINITIONS — populate all four fields for every exercise:
 
-"description": How to perform the movement. Scale detail to difficulty:
+"description": How to perform the movement. Use this EXACT 6-section format for EVERY exercise at ALL difficulty levels. No plain paragraphs. No markdown. No asterisks or bold.
 
-  Beginner: Use this EXACT 4-part structured format. No plain paragraph.
+Use these exact section headers on their own line, followed by the content:
 
-    FIND: [One or two sentences on what the machine looks like and where to find it.
-    Name it as labeled on the equipment. Name one visual identifier — cable, bar, seat, weight stack.]
+FIND THE MACHINE
+[One or two sentences describing what the machine or equipment looks like and where to find it. Name it as it appears on the label. For free weights or bodyweight exercises, describe the equipment needed instead.]
 
-    SETUP: [One or two sentences on how to adjust the machine and position the body.
-    Be specific — "adjust the seat so the handles are at chest height" not "get comfortable".]
+SETUP
+[One or two sentences on how to adjust the machine and position the body before the first rep. Be specific: seat height, grip width, foot placement, stance width — whatever matters most for this exercise.]
 
-    STEPS:
-    1. [Starting position]
-    2. [The movement — use plain direction words: pull, push, lower, raise, hinge, squeeze]
-    3. [The return — how to come back to start]
+HOW TO DO IT
+1. [Starting position]
+2. [The movement — use plain words: pull, push, hinge, lower, raise, squeeze, drive]
+3. [The return to start]
 
-    FEEL: [One or two sentences: what the target muscle should feel like, and one common mistake
-    to help them self-correct.]
+WHAT YOU SHOULD FEEL
+[One or two sentences on the target muscle sensation AND one self-correction cue. Tell the user what it should feel like and what to do if it doesn't feel right.]
 
-    Example output for Lat pulldown:
-    FIND: Look for a cable machine with a long horizontal bar hanging from overhead and a padded seat with a thigh restraint. It is usually labeled "Lat Pulldown" on the weight stack.
-    SETUP: Sit down and pull the thigh pad firmly over your legs so you cannot lift off the seat. Grip the bar wider than shoulder width with your palms facing away from you.
-    STEPS:
-    1. Sit tall with a slight backward lean and arms fully extended above you.
-    2. Pull the bar down to your upper chest by driving your elbows down and back toward your hips.
-    3. Slowly let the bar rise back up until your arms are fully straight again.
-    FEEL: You should feel a deep pulling sensation across your upper back and under your armpits. If your arms tire before your back, loosen your grip and focus on leading with your elbows.
+COACH TIP
+[One sentence. A single most important form cue for this exercise. Different from the feel section — this is technique, not sensation.]
 
-    The description field must contain this formatted text as a single string with \n between sections.
-    Do not use markdown. Do not add extra sections beyond FIND, SETUP, STEPS, FEEL.
+MODIFICATION
+[One sentence describing an easier alternative or regression. If the exercise has no simpler regression, write "None needed at this level."]
 
-  Intermediate: 1–2 sentences. One setup note and one form cue.
-  Example: "Set up with a flat back and retracted shoulder blades. Press to full extension
-  and control the eccentric."
+Scale the language to the difficulty level:
+- beginner: explain what the machine looks like, where to find it, use simple language
+- intermediate: assume they know the equipment, focus on form details
+- advanced: assume full equipment knowledge, focus on performance cues and common faults
 
-  Advanced: 1 sentence max, performance cue only.
-  Example: "Drive through the full range, pause 1s at the bottom."
+The description must be a single string with newline characters between sections.
+Every section header must appear on its own line exactly as written above.
+Every exercise must have all six sections — no exceptions.
 
 "muscleGroups": Array of 1–3 plain English muscle names.
 Use only: Chest, Back, Shoulders, Biceps, Triceps, Core, Quads, Hamstrings, Glutes, Calves, Forearms.
@@ -327,6 +323,11 @@ export async function workoutRoutes(app: FastifyInstance) {
         modification?: string | null
         coachingCue?: string | null
       }>
+    }
+
+    // LOG: raw description of first exercise for prompt validation
+    if (exercises?.[0]?.description) {
+      console.log('=== RAW DESCRIPTION [exercise 0] ===\n', exercises[0].description, '\n=== END ===')
     }
 
     const workout = await prisma.workout.create({
