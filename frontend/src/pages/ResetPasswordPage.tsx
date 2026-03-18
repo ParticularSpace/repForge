@@ -1,14 +1,30 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate()
+  const [ready, setReady] = useState(false)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    // Supabase fires PASSWORD_RECOVERY when the recovery token in the URL hash
+    // is exchanged for a session. We must wait for this before calling updateUser.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setReady(true)
+      }
+    })
+    // If a session already exists (e.g. page reload after token exchange), show the form immediately
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setReady(true)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -20,7 +36,7 @@ export default function ResetPasswordPage() {
     setLoading(false)
     if (error) { setError(error.message); return }
     setSuccess(true)
-    setTimeout(() => navigate('/login'), 2000)
+    setTimeout(() => navigate('/'), 2000)
   }
 
   return (
@@ -34,9 +50,14 @@ export default function ResetPasswordPage() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">Set new password</h2>
 
-          {success ? (
+          {!ready ? (
+            <div className="py-8 flex flex-col items-center gap-3">
+              <span className="h-6 w-6 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
+              <p className="text-sm text-gray-400">Verifying reset link…</p>
+            </div>
+          ) : success ? (
             <div className="text-sm text-teal-700 bg-teal-50 rounded-xl px-4 py-3">
-              Password updated! Redirecting to sign in…
+              Password updated! Taking you home…
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
