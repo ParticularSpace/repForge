@@ -117,12 +117,33 @@ FIELD DEFINITIONS — populate all four fields for every exercise:
 
 "description": How to perform the movement. Scale detail to difficulty:
 
-  Beginner: 3–4 sentences. Include how to find/set up the machine or equipment,
-  starting position, the movement itself, and what they should feel.
-  Write as if explaining to someone who has never been to a gym.
-  Example: "Find the chest press machine and adjust the seat so the handles are at chest height.
-  Sit back against the pad and grip both handles. Push the handles forward until your arms are
-  almost straight, then slowly return to the start. You should feel this in your chest."
+  Beginner: Use this EXACT 4-part structured format. No plain paragraph.
+
+    FIND: [One or two sentences on what the machine looks like and where to find it.
+    Name it as labeled on the equipment. Name one visual identifier — cable, bar, seat, weight stack.]
+
+    SETUP: [One or two sentences on how to adjust the machine and position the body.
+    Be specific — "adjust the seat so the handles are at chest height" not "get comfortable".]
+
+    STEPS:
+    1. [Starting position]
+    2. [The movement — use plain direction words: pull, push, lower, raise, hinge, squeeze]
+    3. [The return — how to come back to start]
+
+    FEEL: [One or two sentences: what the target muscle should feel like, and one common mistake
+    to help them self-correct.]
+
+    Example output for Lat pulldown:
+    FIND: Look for a cable machine with a long horizontal bar hanging from overhead and a padded seat with a thigh restraint. It is usually labeled "Lat Pulldown" on the weight stack.
+    SETUP: Sit down and pull the thigh pad firmly over your legs so you cannot lift off the seat. Grip the bar wider than shoulder width with your palms facing away from you.
+    STEPS:
+    1. Sit tall with a slight backward lean and arms fully extended above you.
+    2. Pull the bar down to your upper chest by driving your elbows down and back toward your hips.
+    3. Slowly let the bar rise back up until your arms are fully straight again.
+    FEEL: You should feel a deep pulling sensation across your upper back and under your armpits. If your arms tire before your back, loosen your grip and focus on leading with your elbows.
+
+    The description field must contain this formatted text as a single string with \n between sections.
+    Do not use markdown. Do not add extra sections beyond FIND, SETUP, STEPS, FEEL.
 
   Intermediate: 1–2 sentences. One setup note and one form cue.
   Example: "Set up with a flat back and retracted shoulder blades. Press to full extension

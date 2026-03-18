@@ -4,6 +4,7 @@ import { useProfile } from '@/hooks/useWorkouts'
 import { useTemplates, useUpdateTemplateExercises, useDeleteTemplate, useStartTemplate } from '@/hooks/useTemplates'
 import EditExerciseModal from '@/components/workout/EditExerciseModal'
 import AddExerciseSheet, { type AiRecommendation } from '@/components/workout/AddExerciseSheet'
+import ExerciseGuidanceSheet from '@/components/workout/ExerciseGuidanceSheet'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import Toast from '@/components/ui/Toast'
 import { formatWeight } from '@/lib/formatWeight'
@@ -29,6 +30,7 @@ export default function TemplateDetailPage() {
   const startTemplate = useStartTemplate()
 
   const [editTarget, setEditTarget] = useState<TemplateExercise | null>(null)
+  const [guidanceExercise, setGuidanceExercise] = useState<TemplateExercise | null>(null)
   const [showConfirm, setShowConfirm] = useState(false)
   const [toast, setToast] = useState(false)
   const [toastMessage, setToastMessage] = useState('Saved!')
@@ -206,7 +208,17 @@ export default function TemplateDetailPage() {
               {template.exercises.map((ex: TemplateExercise) => (
                 <div key={ex.id} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm flex items-start gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 text-sm">{ex.name}</p>
+                    <button
+                      onClick={() => setGuidanceExercise(ex)}
+                      className="font-semibold text-gray-900 text-sm text-left bg-transparent border-0 p-0 cursor-pointer"
+                      style={{
+                        textDecoration: 'underline',
+                        textDecorationColor: '#e5e7eb',
+                        textUnderlineOffset: '3px',
+                      }}
+                    >
+                      {ex.name}
+                    </button>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {ex.sets} sets × {ex.reps} reps @ {formatWeight(ex.weightLbs, ex.isBodyweight)}
                       {ex.restSeconds ? ` · ${ex.restSeconds}s rest` : ''}
@@ -286,6 +298,13 @@ export default function TemplateDetailPage() {
       )}
 
       {toast && <Toast message={toastMessage} onDone={() => setToast(false)} />}
+
+      {guidanceExercise && (
+        <ExerciseGuidanceSheet
+          exercise={{ name: guidanceExercise.name, muscleGroups: guidanceExercise.muscleGroups }}
+          onClose={() => setGuidanceExercise(null)}
+        />
+      )}
     </>
   )
 }

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useCreateWorkout, useProfile } from '@/hooks/useWorkouts'
 import { useCreateTemplate } from '@/hooks/useTemplates'
-import ExerciseInfoModal from '@/components/workout/ExerciseInfoModal'
+import ExerciseGuidanceSheet from '@/components/workout/ExerciseGuidanceSheet'
 import EditExerciseModal from '@/components/workout/EditExerciseModal'
 import AddExerciseSheet from '@/components/workout/AddExerciseSheet'
 import Toast from '@/components/ui/Toast'
@@ -342,18 +342,18 @@ export default function WorkoutPreviewPage() {
                     </div>
                     <div className="flex-1 min-w-0 pr-1">
                       <div className="flex items-center gap-1.5">
-                        <p className={`font-semibold text-gray-900 ${!isSelected ? 'line-through text-gray-400' : ''}`}>
+                        <button
+                          onClick={e => { e.stopPropagation(); setInfoExercise(ex) }}
+                          className={`font-semibold text-gray-900 text-left bg-transparent border-0 p-0 cursor-pointer ${!isSelected ? 'line-through text-gray-400' : ''}`}
+                          style={isSelected ? {
+                            textDecoration: 'underline',
+                            textDecorationColor: '#e5e7eb',
+                            textUnderlineOffset: '3px',
+                          } : undefined}
+                          aria-label={`Learn about ${ex.name}`}
+                        >
                           {ex.name}
-                        </p>
-                        {(ex.description || (ex.muscleGroups && ex.muscleGroups.length > 0)) && (
-                          <button
-                            onClick={e => { e.stopPropagation(); setInfoExercise(ex) }}
-                            className="text-gray-300 hover:text-teal-500 transition-colors shrink-0 text-base leading-none"
-                            aria-label={`Info about ${ex.name}`}
-                          >
-                            ⓘ
-                          </button>
-                        )}
+                        </button>
                         <button
                           onClick={e => { e.stopPropagation(); setEditExercise({ ex, index: i }) }}
                           className="text-gray-300 hover:text-teal-500 transition-colors shrink-0 flex items-center justify-center min-w-[44px] min-h-[44px]"
@@ -444,7 +444,7 @@ export default function WorkoutPreviewPage() {
     </div>
 
     {infoExercise && (
-      <ExerciseInfoModal exercise={infoExercise} onClose={() => setInfoExercise(null)} />
+      <ExerciseGuidanceSheet exercise={infoExercise} onClose={() => setInfoExercise(null)} />
     )}
 
     {editExercise && (

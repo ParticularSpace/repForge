@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useWorkout, useCompleteWorkout, useLogSet, useProfile } from '@/hooks/useWorkouts'
+import { useWorkout, useCompleteWorkout, useLogSet, useProfile, useProfileStats } from '@/hooks/useWorkouts'
 import ExerciseCard from '@/components/workout/ExerciseCard'
 import RestTimer from '@/components/workout/RestTimer'
-import ExerciseInfoModal from '@/components/workout/ExerciseInfoModal'
+import ExerciseGuidanceSheet from '@/components/workout/ExerciseGuidanceSheet'
 import type { Exercise } from '@/types'
+
+const GUIDANCE_HINT_KEY = 'repflow_guidance_hint_shown'
 
 function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0')
@@ -17,6 +19,7 @@ export default function ActiveWorkoutPage() {
   const navigate = useNavigate()
   const { data: workout, isLoading } = useWorkout(id)
   const { data: profile } = useProfile()
+  const { data: stats } = useProfileStats()
   const complete = useCompleteWorkout()
   const logSet = useLogSet()
   const restSeconds = profile?.preferredRestSeconds ?? 60
@@ -27,8 +30,21 @@ export default function ActiveWorkoutPage() {
   const [showRest, setShowRest] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const [showEndConfirm, setShowEndConfirm] = useState(false)
-  const [infoExercise, setInfoExercise] = useState<Exercise | null>(null)
+  const [guidanceExercise, setGuidanceExercise] = useState<Exercise | null>(null)
+  const [hintDismissed, setHintDismissed] = useState(
+    () => localStorage.getItem(GUIDANCE_HINT_KEY) === 'true'
+  )
   const elapsedRef = useRef(0)
+
+  const showGuidanceHint = !hintDismissed && (stats?.totalWorkouts ?? 99) < 3
+
+  const openGuidance = (ex: Exercise) => {
+    setGuidanceExercise(ex)
+    if (!hintDismissed) {
+      setHintDismissed(true)
+      localStorage.setItem(GUIDANCE_HINT_KEY, 'true')
+    }
+  }
 
   // Initialize exercises from fetched workout (only once)
   useEffect(() => {
@@ -134,7 +150,8 @@ export default function ActiveWorkoutPage() {
             exercise={currentEx}
             completedSets={doneSets}
             onSetTap={handleSetTap}
-            onNameTap={() => setInfoExercise(currentEx)}
+            onNameTap={() => openGuidance(currentEx)}
+            showHint={showGuidanceHint}
           />
 
           {showRest && (
@@ -148,9 +165,19 @@ export default function ActiveWorkoutPage() {
           {nextEx && !showRest && (
             <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Up next</p>
-              <p className="font-semibold text-gray-700">
-                {nextEx.name}
-                <span className="text-sm text-gray-400 font-normal ml-2">
+              <p className="font-semibold text-gray-700 flex items-baseline flex-wrap gap-x-2">
+                <button
+                  onClick={() => openGuidance(nextEx)}
+                  className="font-semibold text-gray-700 text-left bg-transparent border-0 p-0 cursor-pointer"
+                  style={{
+                    textDecoration: 'underline',
+                    textDecorationColor: '#e5e7eb',
+                    textUnderlineOffset: '3px',
+                  }}
+                >
+                  {nextEx.name}
+                </button>
+                <span className="text-sm text-gray-400 font-normal">
                   {nextEx.sets} × {nextEx.reps}
                   {` · ${nextEx.weightLbs ? `${nextEx.weightLbs} lbs` : 'No weight set'}`}
                 </span>
@@ -225,8 +252,8 @@ export default function ActiveWorkoutPage() {
         </div>
       )}
 
-      {infoExercise && (
-        <ExerciseInfoModal exercise={infoExercise} onClose={() => setInfoExercise(null)} />
+      {guidanceExercise && (
+        <ExerciseGuidanceSheet exercise={guidanceExercise} onClose={() => setGuidanceExercise(null)} />
       )}
     </div>
   )
