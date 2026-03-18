@@ -22,74 +22,76 @@ export default function ExerciseGuidanceSheet({ exercise, onClose }: Props) {
   const parsed = parseExerciseDescription(exercise.description ?? null)
   const muscleGroups: string[] = (exercise.muscleGroups as string[] | undefined) ?? []
 
-  // Build content sections; render dividers between them
+  const coachTip = parsed.type === 'structured' ? (parsed.coachTip ?? exercise.coachingCue) : exercise.coachingCue
+  const modification = parsed.type === 'structured' ? (parsed.modification ?? exercise.modification) : exercise.modification
+
   const sections: React.ReactElement[] = []
 
-  if (parsed.type === 'structured' && (parsed.find || parsed.setup)) {
-    sections.push(
-      <div key="find">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Find the machine</p>
-        {parsed.find  && <p className="text-[13px] text-gray-500 leading-relaxed">{parsed.find}</p>}
-        {parsed.setup && <p className="text-[13px] text-gray-500 leading-relaxed mt-1.5">{parsed.setup}</p>}
-      </div>
-    )
-  }
-
-  if (parsed.type === 'structured' && parsed.steps && parsed.steps.length > 0) {
-    sections.push(
-      <div key="steps">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">How to do it</p>
-        <div className="flex flex-col gap-2">
-          {parsed.steps.map((step, i) => (
-            <div key={i} className="flex items-start gap-3">
-              <div
-                className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-semibold text-white"
-                style={{ backgroundColor: '#1D9E75' }}
-              >
-                {i + 1}
-              </div>
-              <p className="text-[13px] text-gray-700 leading-snug pt-0.5">{step}</p>
-            </div>
-          ))}
+  if (parsed.type === 'structured') {
+    if (parsed.findMachine || parsed.setup) {
+      sections.push(
+        <div key="find">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Find the machine</p>
+          {parsed.findMachine && <p className="text-[13px] text-gray-500 leading-relaxed">{parsed.findMachine}</p>}
+          {parsed.setup && <p className="text-[13px] text-gray-500 leading-relaxed mt-1.5">{parsed.setup}</p>}
         </div>
-      </div>
-    )
-  }
+      )
+    }
 
-  if (parsed.type === 'structured' && parsed.feel) {
-    sections.push(
-      <div key="feel" className="rounded-lg px-3 py-2.5" style={{ backgroundColor: '#E1F5EE' }}>
-        <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: '#0F6E56' }}>
-          What you should feel
-        </p>
-        <p className="text-[13px] italic leading-relaxed" style={{ color: '#085041' }}>{parsed.feel}</p>
-      </div>
-    )
-  }
+    if (parsed.steps && parsed.steps.length > 0) {
+      sections.push(
+        <div key="steps">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">How to do it</p>
+          <div className="flex flex-col gap-2">
+            {parsed.steps.map((step, i) => (
+              <div key={i} className="flex items-start gap-3">
+                <div
+                  className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-semibold text-white"
+                  style={{ backgroundColor: '#1D9E75' }}
+                >
+                  {i + 1}
+                </div>
+                <p className="text-[13px] text-gray-700 leading-snug pt-0.5">{step}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )
+    }
 
-  if (parsed.type === 'plain' && parsed.raw) {
+    if (parsed.feel) {
+      sections.push(
+        <div key="feel" className="rounded-lg px-3 py-2.5" style={{ backgroundColor: '#E1F5EE' }}>
+          <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: '#0F6E56' }}>
+            What you should feel
+          </p>
+          <p className="text-[13px] italic leading-relaxed" style={{ color: '#085041' }}>{parsed.feel}</p>
+        </div>
+      )
+    }
+  } else if (parsed.raw) {
     sections.push(
       <p key="plain" className="text-[14px] text-gray-500 leading-relaxed">{parsed.raw}</p>
     )
   }
 
-  if (exercise.coachingCue) {
+  if (coachTip) {
     sections.push(
       <div key="coach">
         <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Coach tip</p>
         <div className="bg-gray-50 rounded-lg px-3 py-2.5">
-          <p className="text-[13px] text-gray-500 leading-relaxed">{exercise.coachingCue}</p>
+          <p className="text-[13px] text-gray-500 leading-relaxed">{coachTip}</p>
         </div>
       </div>
     )
   }
 
-  if (exercise.modification) {
+  if (modification) {
     sections.push(
       <div key="mod">
         <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Too hard? Try this</p>
         <div className="bg-gray-50 rounded-lg px-3 py-2.5" style={{ borderLeft: '3px solid #EF9F27' }}>
-          <p className="text-[13px] text-gray-500 leading-relaxed">{exercise.modification}</p>
+          <p className="text-[13px] text-gray-500 leading-relaxed">{modification}</p>
         </div>
       </div>
     )

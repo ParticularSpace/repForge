@@ -1,51 +1,91 @@
 export interface ParsedDescription {
   type: 'structured' | 'plain'
-  find?: string
+  findMachine?: string
   setup?: string
   steps?: string[]
   feel?: string
+  coachTip?: string
+  modification?: string
   raw: string
 }
 
 export function parseExerciseDescription(description: string | null): ParsedDescription {
   if (!description) return { type: 'plain', raw: '' }
 
-  // DIAGNOSTIC — remove after confirming parser works
-  console.log('=== RAW DESCRIPTION ===')
-  console.log(JSON.stringify(description))
-  console.log('=== HEADER CHECKS ===')
-  console.log('find:', /find:/i.test(description))
-  console.log('FIND THE MACHINE:', /FIND THE MACHINE/i.test(description))
-  console.log('steps:', /steps:/i.test(description))
-  console.log('HOW TO DO IT:', /HOW TO DO IT/i.test(description))
-  console.log('=== END ===')
+  // Normalize: remove markdown bold, normalize line endings
+  const normalized = description
+    .replace(/\*\*/g, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .trim()
 
-  // Detect structured format — case-insensitive check
-  const hasStructure = /find:/i.test(description) && /steps:/i.test(description)
+  const HEADERS = [
+    'FIND THE MACHINE',
+    'SETUP',
+    'HOW TO DO IT',
+    'WHAT YOU SHOULD FEEL',
+    'COACH TIP',
+    'MODIFICATION',
+  ]
 
-  if (!hasStructure) {
-    return { type: 'plain', raw: description }
+  const foundCount = HEADERS.filter(h =>
+    new RegExp(h.replace(/ /g, '\\s+'), 'i').test(normalized)
+  ).length
+
+  if (foundCount < 2) {
+    return { type: 'plain', raw: normalized }
   }
 
-  // Parse each section with dotAll + case-insensitive flags
-  const findMatch  = description.match(/FIND:\s*(.+?)(?=\nSETUP:|$)/si)
-  const setupMatch = description.match(/SETUP:\s*(.+?)(?=\nSTEPS:|$)/si)
-  const stepsMatch = description.match(/STEPS:\s*([\s\S]+?)(?=\nFEEL:|$)/si)
-  const feelMatch  = description.match(/FEEL:\s*(.+?)$/si)
+  // Parse line-by-line into sections
+  const lines = normalized.split('\n')
+  const sections: Record<string, string[]> = {}
+  let current = ''
 
-  const stepsBlock = stepsMatch?.[1] ?? ''
-  const steps = stepsBlock
-    .split('\n')
-    .filter(line => /^\d+\./.test(line.trim()))
-    .map(line => line.replace(/^\d+\.\s*/, '').trim())
+  for (const line of lines) {
+    const trimmed = line.trim()
+    const matched = HEADERS.find(h =>
+      new RegExp(`^${h.replace(/ /g, '\\s+')}\\s*:?$`, 'i').test(trimmed)
+    )
+    if (matched) {
+      current = matched.toUpperCase()
+      sections[current] = []
+    } else if (current && trimmed) {
+      sections[current].push(trimmed)
+    }
+  }
+
+  const getText = (key: string): string | undefined =>
+    sections[key]?.join(' ').trim() || undefined
+
+  // Parse numbered steps; fall back to inline splitting
+  const stepLines = sections['HOW TO DO IT'] ?? []
+  let steps = stepLines
+    .filter(line => /^\d+[\.\)]\s/.test(line))
+    .map(line => line.replace(/^\d+[\.\)]\s*/, '').trim())
     .filter(Boolean)
+
+  if (steps.length === 0) {
+    const inline = getText('HOW TO DO IT') ?? ''
+    steps = inline
+      .split(/\s+(?=\d+[\.\)]\s)/)
+      .map(s => s.replace(/^\d+[\.\)]\s*/, '').trim())
+      .filter(s => s.length > 10)
+  }
+
+  const modText = getText('MODIFICATION')
+  const cleanMod =
+    modText && !/^null$/i.test(modText) && !/^none needed/i.test(modText)
+      ? modText
+      : undefined
 
   return {
     type: 'structured',
-    find:  findMatch?.[1]?.trim(),
-    setup: setupMatch?.[1]?.trim(),
+    findMachine: getText('FIND THE MACHINE'),
+    setup: getText('SETUP'),
     steps: steps.length > 0 ? steps : undefined,
-    feel:  feelMatch?.[1]?.trim(),
-    raw:   description,
+    feel: getText('WHAT YOU SHOULD FEEL'),
+    coachTip: getText('COACH TIP'),
+    modification: cleanMod,
+    raw: normalized,
   }
 }
