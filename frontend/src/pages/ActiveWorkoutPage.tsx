@@ -200,18 +200,10 @@ export default function ActiveWorkoutPage() {
             </div>
           )}
 
-          {(currentEx.coachingCue || currentEx.description) && (
-            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Form tips</p>
-              {currentEx.coachingCue && (
-                <div className="flex items-start gap-2 mb-2">
-                  <span className="text-base leading-none mt-0.5">💡</span>
-                  <p className="text-sm font-medium text-teal-700 leading-snug">{currentEx.coachingCue}</p>
-                </div>
-              )}
-              {currentEx.description && (
-                <p className="text-sm text-gray-500 leading-relaxed mt-2">{currentEx.description}</p>
-              )}
+          {currentEx.coachingCue && (
+            <div className="flex items-start gap-2.5 px-1">
+              <span className="text-sm leading-none mt-0.5">💡</span>
+              <p className="text-xs text-gray-500 leading-snug">{currentEx.coachingCue}</p>
             </div>
           )}
         </div>
