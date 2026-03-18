@@ -22,7 +22,6 @@ export default function ExerciseGuidanceSheet({ exercise, onClose }: Props) {
   const parsed = parseExerciseDescription(exercise.description ?? null)
   const muscleGroups: string[] = (exercise.muscleGroups as string[] | undefined) ?? []
 
-  const coachTip = parsed.type === 'structured' ? (parsed.coachTip ?? exercise.coachingCue) : exercise.coachingCue
   const modification = parsed.type === 'structured' ? (parsed.modification ?? exercise.modification) : exercise.modification
 
   const sections: React.ReactElement[] = []
@@ -72,17 +71,6 @@ export default function ExerciseGuidanceSheet({ exercise, onClose }: Props) {
   } else if (parsed.raw) {
     sections.push(
       <p key="plain" className="text-[14px] text-gray-500 leading-relaxed">{parsed.raw}</p>
-    )
-  }
-
-  if (coachTip) {
-    sections.push(
-      <div key="coach">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Coach tip</p>
-        <div className="bg-gray-50 rounded-lg px-3 py-2.5">
-          <p className="text-[13px] text-gray-500 leading-relaxed">{coachTip}</p>
-        </div>
-      </div>
     )
   }
 
