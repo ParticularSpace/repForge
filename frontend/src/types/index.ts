@@ -228,6 +228,7 @@ export interface TemplateExercise {
   isBodyweight?: boolean
   restSeconds?: number | null
   muscleGroups: string[]
+  description?: string | null
 }
 
 export interface WorkoutTemplate {

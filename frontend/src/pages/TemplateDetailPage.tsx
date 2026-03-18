@@ -301,7 +301,7 @@ export default function TemplateDetailPage() {
 
       {guidanceExercise && (
         <ExerciseGuidanceSheet
-          exercise={{ name: guidanceExercise.name, muscleGroups: guidanceExercise.muscleGroups }}
+          exercise={{ name: guidanceExercise.name, muscleGroups: guidanceExercise.muscleGroups, description: guidanceExercise.description }}
           onClose={() => setGuidanceExercise(null)}
         />
       )}

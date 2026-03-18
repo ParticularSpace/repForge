@@ -3,7 +3,7 @@ import { authenticate } from '../middleware/auth'
 import { prisma } from '../lib/prisma'
 import { isPro } from '../lib/userPlan'
 
-function mapTemplate(t: any) {
+function mapTemplate(t: any, libraryByName: Map<string, { description: string | null; muscleGroups: any }> = new Map()) {
   return {
     id: t.id,
     name: t.name,
@@ -15,16 +15,20 @@ function mapTemplate(t: any) {
     useCount: t.useCount,
     exercises: (t.exercises ?? [])
       .sort((a: any, b: any) => a.order - b.order)
-      .map((e: any) => ({
-        id: e.id,
-        name: e.name,
-        order: e.order,
-        sets: e.sets,
-        reps: e.reps,
-        weightLbs: e.weightLbs,
-        restSeconds: e.restSeconds,
-        muscleGroups: (e.muscleGroups as string[] | null) ?? [],
-      })),
+      .map((e: any) => {
+        const lib = libraryByName.get(e.name.toLowerCase())
+        return {
+          id: e.id,
+          name: e.name,
+          order: e.order,
+          sets: e.sets,
+          reps: e.reps,
+          weightLbs: e.weightLbs,
+          restSeconds: e.restSeconds,
+          muscleGroups: (e.muscleGroups as string[] | null) ?? lib?.muscleGroups ?? [],
+          description: lib?.description ?? null,
+        }
+      }),
   }
 }
 
@@ -39,8 +43,18 @@ export async function templateRoutes(fastify: FastifyInstance) {
       orderBy: [{ lastUsedAt: 'desc' }, { createdAt: 'desc' }],
     })
 
-    const manual = templates.filter(t => t.source === 'manual').map(mapTemplate)
-    const ai = templates.filter(t => t.source === 'ai').map(mapTemplate)
+    // Batch-fetch library descriptions for all exercise names
+    const allNames = [...new Set(templates.flatMap(t => t.exercises.map(e => e.name)))]
+    const libraryEntries = allNames.length > 0
+      ? await prisma.exerciseLibrary.findMany({
+          where: { name: { in: allNames } },
+          select: { name: true, description: true, muscleGroups: true },
+        })
+      : []
+    const libraryByName = new Map(libraryEntries.map(e => [e.name.toLowerCase(), e]))
+
+    const manual = templates.filter(t => t.source === 'manual').map(t => mapTemplate(t, libraryByName))
+    const ai = templates.filter(t => t.source === 'ai').map(t => mapTemplate(t, libraryByName))
 
     return { manual, ai }
   })
